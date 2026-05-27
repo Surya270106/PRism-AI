@@ -1,6 +1,7 @@
 {
   "name": "prism-ai",
   "private": true,
+  "packageManager": "npm@11.13.0",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "turbo run dev",
@@ -12,4 +13,4 @@
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   }
-}
+} 
