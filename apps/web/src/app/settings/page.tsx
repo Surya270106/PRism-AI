@@ -38,13 +38,13 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0A0A0A] text-zinc-300 selection:bg-white/30 font-sans">
+    <main className="min-h-screen bg-[#FAFAFA] text-zinc-900 selection:bg-zinc-200 font-sans">
       <div className="mx-auto flex min-h-screen max-w-7xl">
         
         {/* Magic Sidebar */}
-        <aside className="w-64 border-r border-white/[0.08] p-4 flex flex-col gap-1 pt-8 hidden md:flex">
+        <aside className="w-64 border-r border-zinc-200 p-4 flex flex-col gap-1 pt-8 hidden md:flex">
           <div className="px-3 pb-6">
-            <div className="h-6 w-24 bg-white/10 rounded-md animate-pulse" /> {/* Fake Logo/Brand */}
+            <div className="h-6 w-24 bg-zinc-200 rounded-md animate-pulse" /> {/* Fake Logo/Brand */}
           </div>
           
           {NAV_ITEMS.map((item) => {
@@ -57,12 +57,12 @@ export default function SettingsPage() {
                 href={item.href}
                 onMouseEnter={() => setActiveNav(item.id)}
                 className="relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
-                style={{ color: isActive ? "#fff" : "#A1A1AA" }}
+                style={{ color: isActive ? "#09090B" : "#71717A" }}
               >
                 {isActive && (
                   <motion.div
                     layoutId="sidebar-active-indicator"
-                    className="absolute inset-0 rounded-lg bg-white/[0.05] border border-white/[0.05]"
+                    className="absolute inset-0 rounded-lg bg-zinc-100 border border-black/[0.04]"
                     transition={{ type: "spring", bounce: 0, duration: 0.3 }}
                   />
                 )}
@@ -80,19 +80,19 @@ export default function SettingsPage() {
             animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
             transition={{ type: "spring", bounce: 0, duration: 0.5 }}
           >
-            <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">
+            <h1 className="text-2xl font-semibold tracking-tight mb-1">
               Project Settings
             </h1>
             <p className="text-sm text-zinc-500 mb-10">
               Manage your repository behavior and review automation.
             </p>
 
-            {/* Feature Card 1 */}
-            <div className="group relative rounded-xl border border-white/[0.08] bg-white/[0.02] p-6 shadow-[0_0_0_1px_rgba(0,0,0,0.5)] transition-colors hover:bg-white/[0.03]">
+            {/* Feature Card */}
+            <div className="group relative rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-colors hover:border-zinc-300">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-1">
-                  <h3 className="text-base font-medium text-white">Automated PR Reviews</h3>
-                  <p className="text-sm text-zinc-400 leading-relaxed max-w-md">
+                  <h3 className="text-base font-medium">Automated PR Reviews</h3>
+                  <p className="text-sm text-zinc-500 leading-relaxed max-w-md">
                     Allow the AI to automatically review and comment on new pull requests based on your risk threshold.
                   </p>
                 </div>
@@ -101,16 +101,16 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setAutoReview(!autoReview)}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
-                    autoReview ? "bg-white" : "bg-zinc-800"
+                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20 ${
+                    autoReview ? "bg-zinc-900" : "bg-zinc-200"
                   }`}
                 >
                   <span className="sr-only">Use setting</span>
                   <motion.span
                     layout
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-[#0A0A0A] shadow-sm ring-1 ring-black/5 ${
-                      autoReview ? "translate-x-2" : "-translate-x-2 bg-zinc-400"
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-1 ring-black/5 ${
+                      autoReview ? "translate-x-2" : "-translate-x-2"
                     }`}
                   />
                 </button>
@@ -118,11 +118,11 @@ export default function SettingsPage() {
             </div>
 
             {/* Save Action Area */}
-            <div className="mt-8 flex items-center gap-4 border-t border-white/[0.08] pt-6">
+            <div className="mt-8 flex items-center gap-4 border-t border-zinc-200 pt-6">
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="relative flex h-9 items-center justify-center overflow-hidden rounded-md bg-white px-4 text-sm font-medium text-black transition-all hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-white/50 disabled:cursor-not-allowed disabled:opacity-70"
+                className="relative flex h-9 items-center justify-center overflow-hidden rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition-all hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900/20 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <AnimatePresence mode="popLayout" initial={false}>
                   {isSaving ? (
@@ -133,7 +133,7 @@ export default function SettingsPage() {
                       exit={{ opacity: 0, y: -10 }}
                       className="flex items-center gap-2"
                     >
-                      <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
+                      <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
                       <span>Saving...</span>
                     </motion.div>
                   ) : saved ? (
@@ -142,7 +142,7 @@ export default function SettingsPage() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="flex items-center gap-2 text-emerald-600"
+                      className="flex items-center gap-2 text-emerald-400"
                     >
                       <Check className="h-4 w-4" />
                       <span>Saved</span>
