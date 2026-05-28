@@ -13,10 +13,13 @@
     "type-check": "turbo run type-check"
   },
   "devDependencies": {
+    "dotenv": "^17.4.2",
+    "prisma": "^7.8.0",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   },
   "dependencies": {
+    "@prisma/client": "^7.8.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.16.0",

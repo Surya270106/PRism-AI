@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. NextAuth User Model
+model User {
+  id            String     @id @default(cuid())
+  name          String?
+  email         String?    @unique
+  image         String?
+  reviews       PrReview[]
+}
+
+// 2. The AI PR Review Model
+model PrReview {
+  id          String   @id @default(cuid())
+  prId        String   // e.g., "PR-2847"
+  repo        String   // e.g., "Surya270106/PRism-AI"
+  title       String
+  riskScore   String   // "HIGH", "MED", "LOW"
+  summary     String
+  codeDiff    String?  // The raw code changes
+  fixes       String?  // The AI's suggested code fix
+  createdAt   DateTime @default(now())
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+}
