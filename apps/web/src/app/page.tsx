@@ -55,23 +55,23 @@ export default function LandingPage() {
   }, []);
 
   const metrics = [
-    { value: "94%", label: "Catch rate" },
-    { value: "12×", label: "Faster review" },
-    { value: "0", label: "Context switches" },
+    { value: "15s", label: "Recruiter scan time" },
+    { value: "73%", label: "Have fixable red flags" },
+    { value: "0", label: "Sign-ups to analyse" },
   ];
 
   const features = [
-    { icon: "⬡", title: "Semantic diff analysis", desc: "Understands intent, not just lines changed. Flags regressions syntax-level tools miss." },
-    { icon: "◈", title: "Risk scoring", desc: "Every PR gets a calibrated risk score. Prioritise what demands attention." },
-    { icon: "◎", title: "Security surface mapping", desc: "Surfaces auth changes, injection vectors, and exposed endpoints automatically." },
-    { icon: "⬜", title: "Codebase memory", desc: "Builds a graph of your architecture. Each review informed by everything before it." },
+    { icon: "⬡", title: "Eagle Eye HR", desc: "Simulates a recruiter reviewing your profile in 15 seconds. See exactly what a startup HR or FAANG screener would think — before they do." },
+    { icon: "◈", title: "Profile Scorer", desc: "Scores across 8 dimensions: originality, deployments, README quality, activity, tech stack, code structure, documentation, and collaboration." },
+    { icon: "◎", title: "Red Flag Detector", desc: "Catches the silent deal-breakers: tutorial clones, no deployments, copied READMEs, activity gaps, missing pinned repos." },
+    { icon: "⬜", title: "Resume vs GitHub", desc: "Compares what your resume claims against what your repos prove. This is exactly how recruiters already think." },
   ];
 
   const prRows = [
-    { risk: "HIGH", title: "auth/middleware.ts — session validation bypass", color: "#e74c3c" },
-    { risk: "MED",  title: "api/users/[id].ts — missing ownership check",    color: "#c9a84c" },
-    { risk: "LOW",  title: "components/Button.tsx — style refactor",          color: "rgba(255,255,255,0.25)" },
-    { risk: "LOW",  title: "lib/utils.ts — helper function additions",        color: "rgba(255,255,255,0.25)" },
+    { risk: "HIGH", title: "9 of 14 repos are tutorial clones — originality score: 32%",       color: "#e74c3c" },
+    { risk: "HIGH", title: "0 deployed projects detected — recruiters need live proof",          color: "#e74c3c" },
+    { risk: "MED",  title: "Resume claims React expert — only 1 React repo found",              color: "#c9a84c" },
+    { risk: "LOW",  title: "No pinned repositories — weakest repos shown by default",           color: "rgba(255,255,255,0.25)" },
   ];
 
   return (
@@ -93,7 +93,7 @@ export default function LandingPage() {
           -webkit-mask-image:radial-gradient(ellipse at 65% 0%,black 10%,transparent 70%);
         }
 
-        .h1{font-family:'DM Serif Display',Georgia,serif;font-size:clamp(3rem,8vw,7rem);line-height:1.0;letter-spacing:-0.03em;font-weight:400}
+        .h1{font-family:'DM Serif Display',Georgia,serif;font-size:clamp(2rem,5vw,4.5rem);line-height:1.0;letter-spacing:-0.03em;font-weight:400}
         .h1 em{font-style:italic;color:#c9a84c}
         .h2{font-family:'DM Serif Display',Georgia,serif;font-size:clamp(2rem,4vw,3.5rem);font-weight:400;line-height:1.1;letter-spacing:-0.025em}
         .h2 em{font-style:italic;color:rgba(201,168,76,0.55)}
@@ -160,24 +160,24 @@ export default function LandingPage() {
       <section ref={heroRef} style={{ position: "relative", zIndex: 1, minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "140px 48px 80px", maxWidth: 1200, margin: "0 auto" }}>
         <motion.div style={{ y: heroY, opacity: heroOpacity }}>
           <motion.div variants={fadeUp} custom={0} initial="hidden" animate="visible">
-            <span className="tag">AI Code Intelligence</span>
+            <span className="tag">Eagle Eye HR — Career Intelligence</span>
           </motion.div>
 
           <motion.h1 className="h1" variants={fadeUp} custom={0.1} initial="hidden" animate="visible" style={{ marginTop: 28, maxWidth: 860 }}>
-            Every pull request,<br /><em>understood.</em>
+            Find what's missing<br />in your GitHub <em>before<br />recruiters do.</em>
           </motion.h1>
 
           <motion.p variants={fadeUp} custom={0.22} initial="hidden" animate="visible" style={{ marginTop: 28, fontSize: "clamp(14px,1.6vw,17px)", color: "rgba(255,255,255,0.35)", maxWidth: 500, lineHeight: 1.7, fontWeight: 300 }}>
-            PRism reads your codebase the way a senior engineer does — with context, history, and consequence. Reviews that used to take hours happen in seconds.
+            Most students lose jobs not because they lack skills — but because their GitHub profile doesn't show it. PRism analyses your profile the way a recruiter would, in 15 seconds.
           </motion.p>
 
           <motion.div variants={fadeUp} custom={0.34} initial="hidden" animate="visible" style={{ marginTop: 44, display: "flex", gap: 12, flexWrap: "wrap" }}>
             {session ? (
-              <a href="/pr-review" className="btn-primary">Open dashboard →</a>
+              <a href="/pr-review" className="btn-primary">Analyse my GitHub →</a>
             ) : (
               <button onClick={() => signIn("github")} className="btn-primary">Connect GitHub →</button>
             )}
-            <button className="btn-secondary">See it work</button>
+            <button className="btn-secondary">See a sample report</button>
           </motion.div>
 
           <motion.div variants={fadeUp} custom={0.44} initial="hidden" animate="visible" style={{ marginTop: 72, width: 40, height: 1, background: "rgba(201,168,76,0.5)" }} />
@@ -206,7 +206,7 @@ export default function LandingPage() {
               {["#c0392b","#f39c12","#27ae60"].map((c, i) => (
                 <div key={i} style={{ width: 9, height: 9, borderRadius: "50%", background: c, opacity: 0.7 }} />
               ))}
-              <span style={{ marginLeft: 8, fontSize: 10, color: "rgba(255,255,255,0.18)", letterSpacing: "0.06em", fontFamily: "monospace" }}>prism — ai review / feature/auth-refactor</span>
+              <span style={{ marginLeft: 8, fontSize: 10, color: "rgba(255,255,255,0.18)", letterSpacing: "0.06em", fontFamily: "monospace" }}>prism — eagle-eye-hr / github.com/your-username</span>
               <span style={{ marginLeft: "auto", fontSize: 10, color: "rgba(201,168,76,0.5)", fontFamily: "monospace", letterSpacing: "0.05em" }}>● live</span>
             </div>
             {/* Rows stagger in */}
@@ -235,10 +235,10 @@ export default function LandingPage() {
       {/* Features — stagger on scroll */}
       <section style={{ position: "relative", zIndex: 1, padding: "72px 48px 96px", maxWidth: 1200, margin: "0 auto" }}>
         <ScrollReveal>
-          <span className="tag">Capabilities</span>
+          <span className="tag">What PRism analyses</span>
           <h2 className="h2" style={{ marginTop: 18 }}>
-            Built for the complexity<br />
-            <em>of real codebases.</em>
+            Built to think like a recruiter,<br />
+            <em>not a linter.</em>
           </h2>
         </ScrollReveal>
 
@@ -279,8 +279,8 @@ export default function LandingPage() {
         >
           <div style={{ width: 32, height: 1, background: "#c9a84c", margin: "0 auto 40px", opacity: 0.6 }} />
           <div className="cta-h" style={{ marginBottom: 36 }}>
-            Ship with confidence.<br />
-            <em>Every time.</em>
+            See your profile through<br />
+            <em>a recruiter's eyes.</em>
           </div>
           <button onClick={() => signIn("github")} className="btn-primary" style={{ fontSize: 14, padding: "15px 34px" }}>
             Connect GitHub — it&apos;s free →
