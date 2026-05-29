@@ -6,12 +6,12 @@
     "apps/*",
     "packages/*"
   ],
-   "scripts": {
-    "dev": "next dev",
-    "build": "npx prisma generate --schema=../../prisma/schema.prisma && next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
+  "scripts": {
+    "postinstall": "prisma generate",
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check"
   },
   "devDependencies": {
     "@types/pg": "^8.11.0",
