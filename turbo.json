@@ -3,15 +3,27 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": [
-        "GROQ_API_KEY",
-        "HF_TOKEN",
-        "DATABASE_URL",
-        "NEXTAUTH_SECRET",
-        "NEXTAUTH_URL",
-        "GITHUB_ID",
-        "GITHUB_SECRET"
-      ],
+    "env": [
+    "DATABASE_URL",
+    "POSTGRES_URL",
+    "POSTGRES_PRISMA_URL",
+    "POSTGRES_URL_NON_POOLING",
+    "POSTGRES_USER",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_HOST",
+    "POSTGRES_DATABASE",
+    "PGHOST",
+    "PGUSER",
+    "PGPASSWORD",
+    "PGDATABASE",
+    "NEXTAUTH_SECRET",
+    "NEXTAUTH_URL",
+    "GITHUB_ID",
+    "GITHUB_SECRET",
+    "GROQ_API_KEY",
+    "HF_TOKEN",
+    "ANTHROPIC_API_KEY"
+]
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "dev": {
