@@ -13,16 +13,22 @@
     "type-check": "turbo run type-check"
   },
   "devDependencies": {
+    "@types/pg": "^8.20.0",
     "dotenv": "^17.4.2",
     "prisma": "^7.8.0",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
+    "groq-sdk": "^1.2.1",
     "lucide-react": "^1.16.0",
+    "pg": "^8.21.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0"
   }
 }

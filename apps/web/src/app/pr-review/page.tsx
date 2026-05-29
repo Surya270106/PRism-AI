@@ -4,39 +4,29 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// --- Design System Constants ---
-const GOLD = "#d4a843"; 
+const GOLD = "#c9a84c";
 const GOLD_LIGHT = "#e8c87a";
 const DARK_BG = "#060606";
-const SPRING_EASE = [0.23, 1, 0.32, 1]; // Emil's premium strong ease-out
+const SPRING_EASE = [0.23, 1, 0.32, 1];
 
-// --- Animation Variants ---
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   visible: (delay = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.8, ease: SPRING_EASE, delay }
+    opacity: 1, y: 0,
+    transition: { duration: 0.7, delay, ease: SPRING_EASE }
   })
 };
 
 const staggerContainer = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05, delayChildren: 0.1 }
-  }
+  visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.05 } }
 };
 
 const childFadeUp = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { 
-    opacity: 1, y: 0, 
-    transition: { duration: 0.6, ease: SPRING_EASE } 
-  }
+  hidden: { opacity: 0, y: 14 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: SPRING_EASE } }
 };
 
-// --- Types ---
 interface Repo {
   id: number;
   name: string;
@@ -56,75 +46,85 @@ interface PullRequest {
   user: { login: string; avatar_url: string };
   created_at: string;
   html_url: string;
-  body: string;
 }
 
-interface AnalysisResult {
-  riskScore: number;
-  riskLevel: string;
+interface RepoAnalysis {
   summary: string;
-  changes: Array<{ type: string; text: string }>;
-  recommendation: string;
+  risk_score: number;
+  bugs: string[];
+  security: string[];
+  performance: string[];
+  architecture: string[];
+  positives: string[];
+  recommendations: string[];
+}
+
+interface PRReview {
+  title: string;
+  riskScore: string;
+  summary: string;
+  fixes: string;
+  codeDiff: string;
+}
+
+function ScoreRing({ score }: { score: number }) {
+  const color = score >= 75 ? "#e74c3c" : score >= 50 ? "#f39c12" : score >= 25 ? GOLD : "#2ecc71";
+  const label = score >= 75 ? "Critical Risk" : score >= 50 ? "High Risk" : score >= 25 ? "Medium Risk" : "Healthy";
+  const circumference = 2 * Math.PI * 40;
+  return (
+    <div className="flex flex-col items-center justify-center p-6 rounded-xl border border-white/10 bg-white/[0.02]">
+      <div className="relative w-24 h-24 mb-3">
+        <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+          <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+          <circle cx="48" cy="48" r="40" fill="none" stroke={color} strokeWidth="8"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - score / 100)}
+            strokeLinecap="round"
+            style={{ transition: "stroke-dashoffset 1.2s ease" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-2xl font-bold text-white">{score}</span>
+        </div>
+      </div>
+      <span className="text-xs font-mono font-bold tracking-widest" style={{ color }}>{label}</span>
+      <span className="text-[10px] font-mono text-white/30 mt-0.5 uppercase tracking-widest">Risk Score</span>
+    </div>
+  );
 }
 
 export default function PRReviewPage() {
   const { data: session } = useSession();
-  
-  // State: Repositories
+
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(true);
   const [selectedRepo, setSelectedRepo] = useState<Repo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // State: Pull Requests
+
+  const [activeTab, setActiveTab] = useState<"analysis" | "pulls">("analysis");
+
+  // Repo analysis
+  const [repoAnalysis, setRepoAnalysis] = useState<RepoAnalysis | null>(null);
+  const [analyzingRepo, setAnalyzingRepo] = useState(false);
+
+  // PRs
   const [prs, setPrs] = useState<PullRequest[]>([]);
   const [loadingPrs, setLoadingPrs] = useState(false);
   const [prError, setPrError] = useState<string | null>(null);
   const [selectedPr, setSelectedPr] = useState<PullRequest | null>(null);
-  
-  // State: AI Analysis
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [prReview, setPrReview] = useState<PRReview | null>(null);
+  const [analyzingPr, setAnalyzingPr] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // --- High-Performance Mouse Tracking Orb ---
-  // Using useRef and vanilla DOM updates instead of React state for buttery smooth 60fps
-  const orbRef = useRef<HTMLDivElement>(null);
-  
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
   useEffect(() => {
-    let animationFrameId: number;
-    let targetX = 0;
-    let targetY = 0;
-    let currentX = 0;
-    let currentY = 0;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      targetX = e.clientX;
-      targetY = e.clientY;
-    };
-
-    const animateOrb = () => {
-      // Smooth linear interpolation (lerp) for the spring effect
-      currentX += (targetX - currentX) * 0.08;
-      currentY += (targetY - currentY) * 0.08;
-      
-      if (orbRef.current) {
-        orbRef.current.style.transform = `translate3d(${currentX - 200}px, ${currentY - 200}px, 0)`;
-      }
-      animationFrameId = requestAnimationFrame(animateOrb);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    animateOrb();
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      cancelAnimationFrame(animationFrameId);
-    };
+    const handler = (e: MouseEvent) => setMousePos({ x: e.clientX, y: e.clientY });
+    window.addEventListener("mousemove", handler);
+    return () => window.removeEventListener("mousemove", handler);
   }, []);
 
-  // --- API Integrations ---
-
-  // 1. Fetch Repositories on Mount
+  // Fetch repos
   useEffect(() => {
     if (!session) return;
     async function fetchRepos() {
@@ -141,252 +141,173 @@ export default function PRReviewPage() {
     fetchRepos();
   }, [session]);
 
-  // 2. Fetch PRs when a Repo is Selected
+  // Auto-analyze when repo selected
   useEffect(() => {
-    if (!selectedRepo) {
-      setPrs([]);
-      return;
-    }
-    async function fetchPRs() {
-      setLoadingPrs(true);
-      setPrError(null);
-      setSelectedPr(null);
-      setAnalysisResult(null);
-      
-      try {
-        // BUG FIX: Using selectedRepo.full_name to properly target the Github API (e.g. Owner/Repo)
-        const res = await fetch(`/api/prs?repo=${encodeURIComponent(selectedRepo.full_name)}`);
-        const data = await res.json();
-        
-        if (!res.ok || data.error) {
-          throw new Error(data.error || "Failed to connect to GitHub API.");
-        }
-        
-        // BUG FIX: Safely unwrap the 'pulls' array from the API response
-        if (data.pulls && Array.isArray(data.pulls)) {
-          setPrs(data.pulls);
-        } else {
-          setPrs([]);
-        }
-      } catch (err: any) {
-        console.error("Error fetching PRs:", err);
-        setPrError(err.message || "An unexpected error occurred while fetching PRs.");
-        setPrs([]);
-      } finally {
-        setLoadingPrs(false);
-      }
-    }
-    fetchPRs();
+    if (!selectedRepo) return;
+    setRepoAnalysis(null);
+    setPrs([]);
+    setSelectedPr(null);
+    setPrReview(null);
+    setActiveTab("analysis");
+    analyzeRepo(selectedRepo.full_name);
+    fetchPRs(selectedRepo.full_name);
   }, [selectedRepo]);
 
-  // 3. Mock AI Analysis Execution
-  const handleAnalyze = async () => {
-    if (!selectedPr || !selectedRepo) return;
-    setAnalyzing(true);
-    setAnalysisResult(null);
+  async function analyzeRepo(fullName: string) {
+    setAnalyzingRepo(true);
     try {
-      // Simulate heavy AI computation
-      await new Promise((resolve) => setTimeout(resolve, 2800));
-      
-      setAnalysisResult({
-        riskScore: 34,
-        riskLevel: "MEDIUM RISK",
-        summary: "This pull request introduces critical configuration changes to the environment pipeline along with standard security dependency updates. No malicious vectors detected, but thorough integration testing is advised.",
-        changes: [
-          { type: "security", text: "Upgraded jsonwebtoken package to address vulnerability CVE-2026-102" },
-          { type: "refactor", text: "Abstracted token validation logic into the new middleware layer" },
-          { type: "config", text: "Modified docker-compose.yml to include redis cache endpoints" }
-        ],
-        recommendation: "Approved with cautionary review on edge routing cases."
+      const res = await fetch("/api/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo: fullName }),
       });
+      const data = await res.json();
+      if (data.analysis) setRepoAnalysis(data.analysis);
     } catch (err) {
-      console.error(err);
+      console.error("Repo analysis failed:", err);
     } finally {
-      setAnalyzing(false);
+      setAnalyzingRepo(false);
     }
-  };
+  }
 
-  const filteredRepos = repos.filter(repo => 
-    repo.name.toLowerCase().includes(searchQuery.toLowerCase())
+  async function fetchPRs(fullName: string) {
+    setLoadingPrs(true);
+    setPrError(null);
+    try {
+      const res = await fetch(`/api/prs?repo=${encodeURIComponent(fullName)}`);
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "Failed to fetch PRs");
+      setPrs(Array.isArray(data.pulls) ? data.pulls : []);
+    } catch (err: any) {
+      setPrError(err.message);
+    } finally {
+      setLoadingPrs(false);
+    }
+  }
+
+  async function analyzePR(pr: PullRequest) {
+    setSelectedPr(pr);
+    setAnalyzingPr(true);
+    setPrReview(null);
+    try {
+      const res = await fetch("/api/pr-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prUrl: pr.html_url }),
+      });
+      const data = await res.json();
+      if (data.status === "success") setPrReview(data.review);
+    } catch (err) {
+      console.error("PR review failed:", err);
+    } finally {
+      setAnalyzingPr(false);
+    }
+  }
+
+  const filteredRepos = repos.filter(r =>
+    r.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const prRiskColors: Record<string, { text: string; bg: string; border: string }> = {
+    HIGH: { text: "#e74c3c", bg: "rgba(231,76,60,0.1)", border: "rgba(231,76,60,0.2)" },
+    MED:  { text: GOLD,     bg: "rgba(201,168,76,0.1)", border: "rgba(201,168,76,0.2)" },
+    LOW:  { text: "#2ecc71", bg: "rgba(46,204,113,0.1)", border: "rgba(46,204,113,0.2)" },
+  };
+  const activePrColor = prReview
+    ? prRiskColors[prReview.riskScore] || prRiskColors.LOW
+    : prRiskColors.LOW;
 
   return (
     <div className="relative min-h-screen text-white overflow-hidden font-sans" style={{ backgroundColor: DARK_BG }}>
-      
-      {/* --- BACKGROUND EFFECTS --- */}
-      
-      {/* 1. The Premium Animated Aurora */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <motion.div 
-          animate={{ 
-            rotate: [0, 360],
-            scale: [1, 1.15, 1],
-            opacity: [0.3, 0.5, 0.3]
-          }} 
-          transition={{ 
-            duration: 45, 
-            repeat: Infinity, 
-            ease: "linear" 
-          }}
-          className="absolute -top-[20%] -right-[10%] w-[900px] h-[900px] blur-[130px] mix-blend-screen"
-        >
-          {/* Gold drifting band */}
-          <div className="absolute inset-0 rounded-full transform scale-x-150 rotate-45" 
-               style={{ background: `radial-gradient(ellipse at center, ${GOLD} 0%, transparent 70%)` }} />
-          {/* Indigo drifting band */}
-          <div className="absolute inset-0 rounded-full transform scale-y-150 -rotate-45" 
-               style={{ background: `radial-gradient(ellipse at center, rgba(79, 70, 229, 0.6) 0%, transparent 70%)` }} />
-        </motion.div>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap');
+        @keyframes aurora{0%{background-position:50% 50%,50% 50%}100%{background-position:350% 50%,350% 50%}}
+        .aurora-layer{
+          background-image:
+            repeating-linear-gradient(100deg,#000 0%,#000 7%,transparent 10%,transparent 12%,#000 16%),
+            repeating-linear-gradient(100deg,#d4a843 5%,#3b82f6 12%,#a5b4fc 18%,#e8c87a 24%,#60a5fa 30%,#d4a843 40%);
+          background-size:300%,200%;
+          filter:blur(12px);
+          opacity:.32;
+          animation:aurora 18s linear infinite;
+          mask-image:radial-gradient(ellipse at 65% 0%,black 10%,transparent 70%);
+          -webkit-mask-image:radial-gradient(ellipse at 65% 0%,black 10%,transparent 70%);
+        }
+        .custom-scrollbar::-webkit-scrollbar{width:4px}
+        .custom-scrollbar::-webkit-scrollbar-track{background:transparent}
+        .custom-scrollbar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:10px}
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover{background:rgba(201,168,76,0.3)}
+      `}</style>
+
+      {/* AURORA — exact same as landing page */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, overflow: "hidden", pointerEvents: "none" }}>
+        <div className="aurora-layer" style={{ position: "absolute", inset: "-10px" }} />
       </div>
 
-      {/* 2. The Mouse Tracking Interaction Orb */}
-      <div
-        ref={orbRef}
-        className="fixed top-0 left-0 w-[400px] h-[400px] pointer-events-none z-0 opacity-[0.07] blur-[100px] rounded-full will-change-transform"
-        style={{ backgroundColor: GOLD_LIGHT }}
-      />
+      {/* Mouse orb */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
+        <div style={{
+          position: "absolute", width: 500, height: 500, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(201,168,76,0.055) 0%, transparent 70%)",
+          transform: `translate(${mousePos.x - 250}px, ${mousePos.y - 250}px)`,
+          transition: "transform 1s cubic-bezier(0.23,1,0.32,1)",
+        }} />
+      </div>
 
-      {/* --- MAIN LAYOUT GRID --- */}
+      {/* LAYOUT */}
       <div className="relative z-10 grid grid-cols-12 min-h-screen">
-        
-        {/* COLUMN 1: Repositories Sidebar */}
-        <div className="col-span-3 border-r border-white/10 p-6 bg-black/40 backdrop-blur-xl flex flex-col gap-6 shadow-2xl">
-          
-          {/* Branding */}
-          <div className="flex items-center gap-3">
-            <span className="font-serif italic text-2xl font-bold tracking-tight" style={{ color: GOLD }}>PRism</span>
-            <span className="text-xs uppercase tracking-[0.2em] font-mono text-white/40 border border-white/10 px-2 py-0.5 rounded">AI</span>
+
+        {/* COLUMN 1: Repos */}
+        <div className="col-span-3 border-r border-white/[0.07] p-6 flex flex-col gap-5"
+          style={{ background: "rgba(0,0,0,0.3)", backdropFilter: "blur(20px)" }}>
+
+          <div className="flex items-center gap-3 pb-2">
+            <a href="/" className="font-serif italic text-xl font-bold tracking-tight" style={{ color: GOLD }}>PRism</a>
+            <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-white/30 border border-white/10 px-2 py-0.5 rounded">AI</span>
           </div>
 
-          {/* Search Input */}
           <div>
-            <label className="block text-xs uppercase tracking-widest font-mono text-white/40 mb-2">Search Repositories</label>
-            <div className="relative group">
-              <input
-                type="text"
-                placeholder="Filter codebases..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50 transition-all duration-300 font-mono placeholder:text-white/20"
-              />
-              <div className="absolute inset-0 border border-amber-500/0 group-focus-within:border-amber-500/20 rounded-md pointer-events-none transition-colors duration-500" />
-            </div>
+            <label className="block text-[10px] uppercase tracking-widest font-mono text-white/30 mb-2">Search</label>
+            <input
+              type="text"
+              placeholder="Filter repos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white/[0.04] border border-white/10 rounded px-3 py-2 text-xs focus:outline-none focus:border-amber-500/40 transition-all font-mono placeholder:text-white/20"
+            />
           </div>
 
-          {/* Repo List */}
-          <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-            <span className="block text-xs uppercase tracking-widest font-mono text-white/40 mb-3 sticky top-0 bg-black/40 backdrop-blur-md py-1 z-10">Your Repositories</span>
-            
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1.5">
+            <span className="block text-[10px] uppercase tracking-widest font-mono text-white/30 mb-2">Your Repositories</span>
             {loadingRepos ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="w-full h-16 bg-white/[0.03] animate-pulse rounded border border-white/5" />
-                ))}
-              </div>
+              [...Array(5)].map((_, i) => (
+                <div key={i} className="h-14 bg-white/[0.02] animate-pulse rounded border border-white/5" />
+              ))
             ) : filteredRepos.length === 0 ? (
-              <div className="text-sm font-mono text-white/30 py-4 text-center border border-dashed border-white/10 rounded py-8">No repositories discovered.</div>
+              <div className="text-xs font-mono text-white/20 text-center border border-dashed border-white/10 rounded py-8">No repositories found.</div>
             ) : (
-              <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-2">
+              <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-1.5">
                 {filteredRepos.map((repo) => (
                   <motion.button
                     variants={childFadeUp}
                     key={repo.id}
                     onClick={() => setSelectedRepo(repo)}
-                    className={`w-full text-left p-3.5 rounded-lg transition-all duration-300 border flex flex-col gap-1.5 group relative ${
+                    className={`w-full text-left p-3 rounded-lg border transition-all duration-300 flex flex-col gap-1 group ${
                       selectedRepo?.id === repo.id
                         ? "bg-white/10 border-amber-500/40 shadow-[0_0_15px_rgba(212,168,67,0.1)]"
-                        : "bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/10"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="font-medium text-sm truncate max-w-[170px] group-hover:text-amber-100 transition-colors">{repo.name}</span>
-                      {repo.private && <span className="text-[9px] font-mono opacity-50 px-1.5 py-0.5 border border-white/10 rounded bg-black/50">PRV</span>}
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-white/40">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400/60 shadow-[0_0_5px_rgba(251,191,36,0.5)]" />
-                        {repo.language || "Markdown"}
-                      </span>
-                      <span>{new Date(repo.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                    </div>
-                  </motion.button>
-                ))}
-              </motion.div>
-            )}
-          </div>
-        </div>
-
-        {/* COLUMN 2: Pull Requests View List */}
-        <div className="col-span-4 border-r border-white/10 p-8 flex flex-col gap-6 bg-black/20 backdrop-blur-sm z-10">
-          
-          <div className="border-b border-white/10 pb-6">
-            <span className="block text-xs uppercase tracking-widest font-mono text-white/40 mb-2">Context Target</span>
-            <h2 className="font-serif italic text-3xl font-semibold tracking-wide text-white drop-shadow-md">
-              {selectedRepo ? selectedRepo.name : "Select Repository"}
-            </h2>
-          </div>
-
-          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            {!selectedRepo ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center text-center p-6 text-white/30 font-mono text-sm">
-                <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center mb-4 bg-white/[0.02]">
-                  <svg className="w-5 h-5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 002-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                Connect a repository from the left panel to scan branch pipelines.
-              </motion.div>
-            ) : loadingPrs ? (
-              <div className="space-y-4 pt-4">
-                <div className="text-xs font-mono text-amber-500/60 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-ping" />
-                  Fetching pull streams...
-                </div>
-                {[1, 2].map(i => (
-                  <div key={i} className="w-full h-24 bg-white/[0.02] animate-pulse rounded-lg border border-white/5" />
-                ))}
-              </div>
-            ) : prError ? (
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-5 rounded-lg border border-red-500/20 bg-red-500/5 text-center mt-4">
-                <span className="text-red-400 text-xs font-mono uppercase tracking-widest block mb-2 font-bold">API Connection Error</span>
-                <span className="text-sm text-red-200/80 font-mono leading-relaxed">{prError}</span>
-              </motion.div>
-            ) : prs.length === 0 ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center text-center p-6 text-white/40 font-mono text-sm">
-                <span className="text-emerald-400/60 text-[10px] font-mono uppercase tracking-widest mb-3 border border-emerald-500/20 px-2 py-1 rounded bg-emerald-500/5">Status Clear</span>
-                <p className="mb-2">No active pull requests found.</p>
-                <p className="text-[11px] text-white/20 max-w-[200px] leading-relaxed">Open a new Pull Request on GitHub to begin analysis.</p>
-              </motion.div>
-            ) : (
-              <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3 pt-2">
-                <span className="block text-xs uppercase tracking-widest font-mono text-white/40 mb-4 sticky top-0 bg-transparent py-1 backdrop-blur-sm z-10">Discovered Pull Requests</span>
-                {prs.map((pr) => (
-                  <motion.button
-                    variants={childFadeUp}
-                    key={pr.id}
-                    onClick={() => setSelectedPr(pr)}
-                    className={`w-full text-left p-5 rounded-lg border transition-all duration-300 flex flex-col gap-3 group ${
-                      selectedPr?.id === pr.id
-                        ? "bg-gradient-to-br from-white/10 to-white/5 border-amber-500/40 shadow-lg"
                         : "bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/10"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="font-serif text-lg leading-tight font-medium group-hover:text-amber-100 transition-colors line-clamp-2">{pr.title}</span>
-                      <span className="text-xs font-mono text-white/30 whitespace-nowrap mt-1 bg-white/5 px-1.5 py-0.5 rounded">#{pr.number}</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium truncate max-w-[160px] group-hover:text-amber-100 transition-colors">{repo.name}</span>
+                      {repo.private && <span className="text-[8px] font-mono text-white/30 border border-white/10 px-1 rounded">PRV</span>}
                     </div>
-                    <div className="flex items-center justify-between text-xs font-mono text-white/50 pt-3 border-t border-white/5">
-                      <span className="flex items-center gap-2">
-                        <img src={pr.user.avatar_url} alt={pr.user.login} className="w-5 h-5 rounded-full border border-white/20 grayscale group-hover:grayscale-0 transition-all" />
-                        {pr.user.login}
+                    <div className="flex items-center justify-between text-[10px] font-mono text-white/30">
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400/50" />
+                        {repo.language || "—"}
                       </span>
-                      <span className={`px-2 py-1 rounded-[4px] text-[10px] uppercase tracking-wider font-bold ${
-                        pr.state === 'open' 
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]' 
-                          : 'bg-white/5 text-white/40 border border-white/10'
-                      }`}>
-                        {pr.state}
-                      </span>
+                      <span>{new Date(repo.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
                     </div>
                   </motion.button>
                 ))}
@@ -395,176 +316,360 @@ export default function PRReviewPage() {
           </div>
         </div>
 
-        {/* COLUMN 3: Detailed Analysis Display Panel */}
-        <div className="col-span-5 p-10 overflow-y-auto custom-scrollbar flex flex-col justify-between relative bg-black/10 backdrop-blur-sm z-10">
-          <AnimatePresence mode="wait">
-            
-            {/* NO PR SELECTED STATE */}
-            {!selectedPr && (
-              <motion.div 
-                key="empty-state"
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }}
-                className="h-full flex flex-col items-center justify-center text-center text-white/30 font-mono text-sm max-w-sm mx-auto"
-              >
-                <div className="w-16 h-16 rounded-full border border-white/5 flex items-center justify-center mb-6 bg-gradient-to-b from-white/[0.05] to-transparent">
-                  <svg className="w-6 h-6 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        {/* COLUMN 2 + 3: Main Content */}
+        <div className="col-span-9 flex flex-col overflow-hidden"
+          style={{ background: "rgba(0,0,0,0.12)", backdropFilter: "blur(8px)" }}>
+
+          {!selectedRepo ? (
+            <div className="flex-1 flex items-center justify-center text-center">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center mx-auto mb-6 bg-white/[0.02]">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke={GOLD} strokeWidth={1.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <p className="text-white/50 leading-relaxed">Select an engineering stream patch request file to deploy automated AI logic parsing.</p>
+                <p className="text-sm font-mono text-white/30">Select a repository to begin analysis</p>
+                <p className="text-xs font-mono text-white/15 mt-2">PRism will scan it through an HR's eye</p>
               </motion.div>
-            )}
-
-            {/* PR SELECTED & READY FOR ANALYSIS */}
-            {selectedPr && (
-              <motion.div
-                key={selectedPr.id}
-                variants={fadeUp}
-                initial="hidden"
-                animate="visible"
-                className="space-y-8 flex-1"
-              >
-                {/* Header: PR Meta Information */}
-                <div className="border-b border-white/10 pb-8">
-                  <div className="flex items-center gap-2 text-[11px] font-mono text-white/40 mb-4 uppercase tracking-wider">
-                    <span className="text-white/60">{selectedRepo?.full_name}</span>
-                    <span className="text-white/20">/</span>
-                    <span style={{ color: GOLD }}>PR #{selectedPr.number}</span>
+            </div>
+          ) : (
+            <>
+              {/* Repo Header */}
+              <div className="px-8 pt-7 pb-0 border-b border-white/[0.06]">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-1">{selectedRepo.full_name}</p>
+                    <h1 className="font-serif italic text-3xl text-white">{selectedRepo.name}</h1>
                   </div>
-                  <h1 className="font-serif italic text-4xl font-bold tracking-tight text-white mb-6 leading-tight drop-shadow-lg">
-                    {selectedPr.title}
-                  </h1>
-                  <a
-                    href={selectedPr.html_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-xs font-mono border border-white/20 bg-white/5 px-4 py-2 rounded-md hover:bg-white/10 hover:border-amber-500/50 transition-all duration-300"
-                    style={{ color: GOLD }}
-                  >
-                    View Source on GitHub ↗
+                  <a href={"https://github.com/" + selectedRepo.full_name} target="_blank" rel="noopener noreferrer"
+                    className="text-[11px] font-mono text-white/30 hover:text-amber-400 transition-colors border border-white/10 px-3 py-1.5 rounded hover:border-amber-500/30 mt-1">
+                    View on GitHub ↗
                   </a>
                 </div>
 
-                {/* Pre-Analysis Trigger */}
-                {!analysisResult && !analyzing && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-b from-white/[0.04] to-transparent border border-white/5 rounded-xl p-10 text-center space-y-6 relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
-                    <p className="font-serif italic text-xl text-white/80">Ready to execute high-fidelity token vector analysis.</p>
+                {/* Tabs */}
+                <div className="flex gap-0">
+                  {(["analysis", "pulls"] as const).map((tab) => (
                     <button
-                      onClick={handleAnalyze}
-                      className="px-8 py-3.5 rounded-md text-sm font-mono font-bold tracking-[0.2em] transition-all duration-300 transform hover:scale-[1.02] active:scale-95 bg-gradient-to-r text-black shadow-[0_0_20px_rgba(212,168,67,0.3)] hover:shadow-[0_0_30px_rgba(212,168,67,0.5)]"
-                      style={{ backgroundImage: `linear-gradient(to right, ${GOLD}, ${GOLD_LIGHT})` }}
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-5 py-2.5 text-[11px] font-mono uppercase tracking-widest transition-colors relative border-b-2 ${
+                        activeTab === tab
+                          ? "text-amber-400 border-amber-500/60"
+                          : "text-white/30 border-transparent hover:text-white/60"
+                      }`}
                     >
-                      INITIATE SCAN
+                      {tab === "analysis" ? "HR Analysis" : `Pull Requests ${prs.length > 0 ? `(${prs.length})` : ""}`}
                     </button>
-                  </motion.div>
-                )}
+                  ))}
+                </div>
+              </div>
 
-                {/* Loading State Spinner */}
-                {analyzing && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-24 text-center space-y-6 flex flex-col items-center">
-                    <div className="relative w-16 h-16">
-                      <div className="absolute inset-0 border-2 border-white/10 rounded-full" />
-                      <div className="absolute inset-0 border-2 border-t-transparent border-r-transparent rounded-full animate-spin" style={{ borderColor: `${GOLD} transparent transparent ${GOLD}` }} />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm font-mono text-amber-500 tracking-[0.2em] uppercase animate-pulse">Analyzing Vectors</p>
-                      <p className="text-[10px] font-mono text-white/30 tracking-widest uppercase">Parsing AST changes & validating safety constraints...</p>
-                    </div>
-                  </motion.div>
-                )}
+              {/* Tab Content */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                <AnimatePresence mode="wait">
 
-                {/* Completed Analysis Dashboard */}
-                {analysisResult && !analyzing && (
-                  <motion.div
-                    variants={staggerContainer}
-                    initial="hidden"
-                    animate="visible"
-                    className="space-y-8"
-                  >
-                    {/* Metrics Grid */}
-                    <motion.div variants={childFadeUp} className="grid grid-cols-2 gap-5">
-                      <div className="p-5 rounded-lg border border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent shadow-inner">
-                        <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2">Risk Score Evaluated</span>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-serif font-bold drop-shadow-md" style={{ color: GOLD }}>{analysisResult.riskScore}<span className="text-2xl">%</span></span>
-                        </div>
-                      </div>
-                      <div className="p-5 rounded-lg border border-amber-500/20 bg-amber-500/5 flex flex-col justify-center shadow-[inset_0_0_20px_rgba(212,168,67,0.02)]">
-                        <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-2">Security Category</span>
-                        <span className="text-sm font-mono font-bold tracking-widest text-amber-400 bg-amber-400/10 w-max px-3 py-1 rounded-sm border border-amber-400/20">{analysisResult.riskLevel}</span>
-                      </div>
-                    </motion.div>
-
-                    {/* Summary Paragraph */}
-                    <motion.div variants={childFadeUp} className="space-y-3">
-                      <h3 className="text-[11px] font-mono uppercase tracking-[0.2em] text-white/50 border-b border-white/5 pb-2">Executive Verdict</h3>
-                      <p className="text-sm text-white/80 leading-relaxed font-sans border-l-2 pl-5 py-1 border-amber-500/40 bg-gradient-to-r from-amber-500/5 to-transparent">
-                        {analysisResult.summary}
-                      </p>
-                    </motion.div>
-
-                    {/* Detected Mutations List */}
-                    <motion.div variants={childFadeUp} className="space-y-4">
-                      <h3 className="text-[11px] font-mono uppercase tracking-[0.2em] text-white/50 border-b border-white/5 pb-2">Detected Vector Mutations</h3>
-                      <div className="space-y-2.5">
-                        {analysisResult.changes.map((change: any, i: number) => (
-                          <div key={i} className="p-4 rounded-md bg-white/[0.02] border border-white/5 flex items-start gap-4 hover:bg-white/[0.04] transition-colors">
-                            <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-1 rounded bg-black/50 text-white/60 border border-white/10 mt-0.5 min-w-[80px] text-center shadow-inner">
-                              {change.type}
-                            </span>
-                            <span className="text-sm text-white/70 font-mono leading-relaxed">{change.text}</span>
+                  {/* ANALYSIS TAB */}
+                  {activeTab === "analysis" && (
+                    <motion.div key="analysis"
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}
+                      className="max-w-4xl"
+                    >
+                      {analyzingRepo && (
+                        <div className="flex flex-col items-center justify-center py-24 text-center">
+                          <div className="relative w-14 h-14 mb-6">
+                            <div className="absolute inset-0 border-2 border-white/10 rounded-full" />
+                            <div className="absolute inset-0 border-2 border-t-amber-500 border-r-amber-500 border-b-transparent border-l-transparent rounded-full animate-spin" />
                           </div>
-                        ))}
-                      </div>
-                    </motion.div>
+                          <p className="text-sm font-mono text-amber-500/80 tracking-widest uppercase animate-pulse">Scanning Repository</p>
+                          <p className="text-[11px] font-mono text-white/20 mt-2 tracking-wider">Reading README · Analyzing structure · Generating HR report</p>
+                        </div>
+                      )}
 
-                    {/* Final Recommendation */}
-                    <motion.div variants={childFadeUp} className="p-5 rounded-lg border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-transparent space-y-2 relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/50" />
-                      <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-emerald-400/80">PRism Official Recommendation</span>
-                      <p className="text-lg font-serif italic text-emerald-100/90 tracking-wide">{analysisResult.recommendation}</p>
-                    </motion.div>
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                      {repoAnalysis && !analyzingRepo && (
+                        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
 
-          {/* Footer Branding */}
-          <div className="pt-8 mt-8 border-t border-white/10 flex justify-between items-center text-[10px] font-mono text-white/30 tracking-[0.2em] uppercase">
-            <span className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_5px_rgba(16,185,129,0.5)]" />
-              Secure Shield Pipeline
-            </span>
-            <span>v1.0.4-PROD</span>
-          </div>
+                          {/* HR Eye Banner */}
+                          <motion.div variants={childFadeUp} className="p-4 rounded-lg border border-amber-500/20 bg-amber-500/5 flex items-center gap-3">
+                            <span className="text-lg">👁️</span>
+                            <div>
+                              <p className="text-[10px] font-mono uppercase tracking-widest text-amber-400/70 mb-0.5">HR Eagle Eye View</p>
+                              <p className="text-xs text-white/60 font-mono">Here is what a hiring manager sees when they look at this repository</p>
+                            </div>
+                          </motion.div>
+
+                          {/* Summary + Score */}
+                          <motion.div variants={childFadeUp} className="grid grid-cols-3 gap-4">
+                            <div className="col-span-2 p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+                              <p className="text-[10px] font-mono uppercase tracking-widest text-white/30 mb-3">Overall Assessment</p>
+                              <p className="text-sm text-white/75 leading-relaxed border-l-2 border-amber-500/40 pl-4">{repoAnalysis.summary}</p>
+                            </div>
+                            <ScoreRing score={repoAnalysis.risk_score} />
+                          </motion.div>
+
+                          {/* Bugs + Security */}
+                          <motion.div variants={childFadeUp} className="grid grid-cols-2 gap-4">
+                            <div className="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+                              <p className="text-[10px] font-mono uppercase tracking-widest text-red-400/70 mb-3">🐛 Bugs to Fix</p>
+                              <ul className="space-y-2">
+                                {repoAnalysis.bugs.length === 0 ? (
+                                  <li className="text-xs text-green-400 font-mono">No bugs detected ✓</li>
+                                ) : repoAnalysis.bugs.map((b, i) => (
+                                  <li key={i} className="flex items-start gap-2 text-xs text-white/60 font-mono">
+                                    <span className="text-red-400 mt-0.5 flex-shrink-0">●</span>{b}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div className="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+                              <p className="text-[10px] font-mono uppercase tracking-widest text-orange-400/70 mb-3">🔒 Security Issues</p>
+                              <ul className="space-y-2">
+                                {repoAnalysis.security.length === 0 ? (
+                                  <li className="text-xs text-green-400 font-mono">No issues ✓</li>
+                                ) : repoAnalysis.security.map((s, i) => (
+                                  <li key={i} className="flex items-start gap-2 text-xs text-white/60 font-mono">
+                                    <span className="text-orange-400 mt-0.5 flex-shrink-0">●</span>{s}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </motion.div>
+
+                          {/* Performance + Architecture */}
+                          <motion.div variants={childFadeUp} className="grid grid-cols-2 gap-4">
+                            <div className="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+                              <p className="text-[10px] font-mono uppercase tracking-widest text-yellow-400/70 mb-3">⚡ Performance</p>
+                              <ul className="space-y-2">
+                                {repoAnalysis.performance.map((p, i) => (
+                                  <li key={i} className="flex items-start gap-2 text-xs text-white/60 font-mono">
+                                    <span className="text-yellow-400 mt-0.5 flex-shrink-0">●</span>{p}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div className="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+                              <p className="text-[10px] font-mono uppercase tracking-widest text-blue-400/70 mb-3">🏗️ Architecture</p>
+                              <ul className="space-y-2">
+                                {repoAnalysis.architecture.map((a, i) => (
+                                  <li key={i} className="flex items-start gap-2 text-xs text-white/60 font-mono">
+                                    <span className="text-blue-400 mt-0.5 flex-shrink-0">●</span>{a}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </motion.div>
+
+                          {/* Positives */}
+                          <motion.div variants={childFadeUp} className="p-5 rounded-xl border border-green-500/20 bg-green-500/5">
+                            <p className="text-[10px] font-mono uppercase tracking-widest text-green-400/70 mb-3">✅ What You Are Doing Well</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {repoAnalysis.positives.map((p, i) => (
+                                <div key={i} className="flex items-start gap-2 text-xs text-white/60 font-mono">
+                                  <span className="text-green-400 flex-shrink-0">✓</span>{p}
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+
+                          {/* Priority Action List */}
+                          <motion.div variants={childFadeUp} className="p-5 rounded-xl border border-amber-500/25 bg-amber-500/5">
+                            <p className="text-[10px] font-mono uppercase tracking-widest mb-3" style={{ color: "rgba(201,168,76,0.8)" }}>
+                              📋 Fix These Before Your Next Job Application
+                            </p>
+                            <ol className="space-y-3">
+                              {repoAnalysis.recommendations.map((r, i) => (
+                                <li key={i} className="flex items-start gap-3 text-xs text-white/65 font-mono">
+                                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-[10px] font-bold" style={{ color: GOLD }}>
+                                    {i + 1}
+                                  </span>
+                                  {r}
+                                </li>
+                              ))}
+                            </ol>
+                          </motion.div>
+
+                          <motion.div variants={childFadeUp}>
+                            <button
+                              onClick={() => analyzeRepo(selectedRepo.full_name)}
+                              className="text-[10px] font-mono text-white/20 hover:text-white/50 transition-colors uppercase tracking-widest"
+                            >
+                              ↺ Re-run analysis
+                            </button>
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* PULL REQUESTS TAB */}
+                  {activeTab === "pulls" && (
+                    <motion.div key="pulls"
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}
+                      className="max-w-4xl"
+                    >
+                      {loadingPrs && (
+                        <div className="flex items-center gap-3 py-8 font-mono text-xs text-amber-500/60 uppercase tracking-widest">
+                          <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-ping" />
+                          Fetching pull requests...
+                        </div>
+                      )}
+
+                      {prError && (
+                        <div className="p-4 rounded-lg border border-red-500/20 bg-red-500/5 text-xs font-mono text-red-400">{prError}</div>
+                      )}
+
+                      {!loadingPrs && !prError && prs.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-white/10 rounded-xl">
+                          <span className="text-[10px] font-mono uppercase tracking-widest text-green-400/60 border border-green-500/20 px-2 py-1 rounded bg-green-500/5 mb-3">Status Clear</span>
+                          <p className="text-sm font-mono text-white/30">No pull requests found</p>
+                          <p className="text-xs font-mono text-white/15 mt-1 max-w-xs">Open a Pull Request on GitHub to begin diff analysis</p>
+                        </div>
+                      )}
+
+                      {/* PR List */}
+                      {!loadingPrs && !selectedPr && prs.length > 0 && (
+                        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3">
+                          <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-4">Click a PR to run AI diff review</p>
+                          {prs.map((pr) => (
+                            <motion.button
+                              variants={childFadeUp}
+                              key={pr.id}
+                              onClick={() => analyzePR(pr)}
+                              className="w-full text-left p-5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-amber-500/20 transition-all group"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <span className="font-serif text-lg text-white/85 group-hover:text-white transition-colors line-clamp-1">{pr.title}</span>
+                                  <div className="flex items-center gap-3 mt-2 text-[10px] font-mono text-white/30">
+                                    <img src={pr.user.avatar_url} alt={pr.user.login} className="w-4 h-4 rounded-full grayscale group-hover:grayscale-0 transition-all" />
+                                    <span>{pr.user.login}</span>
+                                    <span>#{pr.number}</span>
+                                    <span>{new Date(pr.created_at).toLocaleDateString()}</span>
+                                  </div>
+                                </div>
+                                <span className={`text-[9px] font-mono font-bold px-2 py-1 rounded border uppercase tracking-wider flex-shrink-0 ${
+                                  pr.state === "open"
+                                    ? "text-green-400 border-green-500/20 bg-green-500/10"
+                                    : "text-white/30 border-white/10 bg-white/5"
+                                }`}>{pr.state}</span>
+                              </div>
+                            </motion.button>
+                          ))}
+                        </motion.div>
+                      )}
+
+                      {/* PR Analyzing */}
+                      {analyzingPr && (
+                        <div className="flex flex-col items-center justify-center py-24 text-center">
+                          <div className="relative w-14 h-14 mb-6">
+                            <div className="absolute inset-0 border-2 border-white/10 rounded-full" />
+                            <div className="absolute inset-0 border-2 border-t-amber-500 border-r-amber-500 border-b-transparent border-l-transparent rounded-full animate-spin" />
+                          </div>
+                          <p className="text-sm font-mono text-amber-500/80 tracking-widest uppercase animate-pulse">Analyzing PR Diff</p>
+                          <p className="text-[11px] font-mono text-white/20 mt-2">Running Llama 3.3 vector analysis...</p>
+                        </div>
+                      )}
+
+                      {/* PR Review Results */}
+                      {prReview && selectedPr && !analyzingPr && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                          <button
+                            onClick={() => { setSelectedPr(null); setPrReview(null); }}
+                            className="text-[10px] font-mono text-white/30 hover:text-white/60 uppercase tracking-widest mb-2 transition-colors"
+                          >
+                            ← Back to all PRs
+                          </button>
+
+                          <div className="p-5 rounded-xl border relative overflow-hidden"
+                            style={{ borderColor: activePrColor.border, background: "rgba(255,255,255,0.02)" }}>
+                            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: activePrColor.text }} />
+                            <div className="flex items-start gap-4 pl-2">
+                              <div>
+                                <div className="flex items-center gap-3 mb-1">
+                                  <h3 className="text-white font-medium text-sm">{prReview.title}</h3>
+                                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded tracking-wider"
+                                    style={{ color: activePrColor.text, background: activePrColor.bg, border: `1px solid ${activePrColor.border}` }}>
+                                    {prReview.riskScore} RISK
+                                  </span>
+                                </div>
+                                <p className="text-xs text-white/55 font-mono leading-relaxed mb-3">{prReview.summary}</p>
+                                <button
+                                  onClick={() => setIsModalOpen(true)}
+                                  className="text-[11px] font-mono flex items-center gap-1 px-3 py-1.5 rounded border transition-colors"
+                                  style={{ color: activePrColor.text, background: activePrColor.bg, borderColor: activePrColor.border }}
+                                >
+                                  View Suggested Fix →
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-white/[0.06] bg-black/30 overflow-hidden">
+                            <div className="px-4 py-3 border-b border-white/[0.05] bg-white/[0.02]">
+                              <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest">Code Diff</span>
+                            </div>
+                            <div className="p-4 overflow-auto max-h-[400px]">
+                              <pre className="text-[11px] font-mono text-white/30 leading-relaxed">
+                                <code>{prReview.codeDiff || "No diff available."}</code>
+                              </pre>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  )}
+
+                </AnimatePresence>
+              </div>
+            </>
+          )}
         </div>
-
       </div>
 
-      {/* --- GLOBAL CSS OVERRIDES --- */}
+      {/* PR Fix Modal */}
+      <AnimatePresence>
+        {isModalOpen && prReview && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-8">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              transition={{ duration: 0.3, ease: SPRING_EASE }}
+              className="relative w-full max-w-2xl bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-white/[0.06] bg-white/[0.02]">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-mono text-white/70">Suggested Fix</span>
+                  <span className="text-[9px] font-mono text-amber-400/60 border border-amber-500/20 px-1.5 py-0.5 rounded">AI</span>
+                </div>
+                <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-white/10 rounded transition-colors">
+                  <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto">
+                <p className="text-sm text-white/65 font-mono whitespace-pre-wrap leading-relaxed">{prReview.fixes}</p>
+              </div>
+              <div className="p-4 border-t border-white/[0.06] bg-white/[0.02] flex justify-end gap-3">
+                <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-xs font-mono text-white/30 hover:text-white/60 transition-colors">Dismiss</button>
+                <button className="px-4 py-2 text-xs font-mono font-bold text-black rounded transition-opacity hover:opacity-85"
+                  style={{ background: `linear-gradient(to right, ${GOLD}, ${GOLD_LIGHT})` }}>
+                  Apply Fix
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <style jsx global>{`
-        /* Premium custom scrollbar styling */
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 10px;
-          border: 2px solid transparent;
-          background-clip: padding-box;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(212, 168, 67, 0.4);
-          border: 1px solid transparent;
-          background-clip: padding-box;
-        }
+        body { background: ${DARK_BG}; }
       `}</style>
     </div>
   );
