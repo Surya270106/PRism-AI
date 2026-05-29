@@ -10,7 +10,7 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "type-check": "turbo run type-check"
+    "type-check": "turbo run type-check",
     "postinstall": "prisma generate"
   },
   "devDependencies": {
@@ -33,3 +33,4 @@
     "tailwind-merge": "^3.6.0"
   }
 }
+
