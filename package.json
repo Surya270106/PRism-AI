@@ -22,13 +22,11 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@prisma/adapter-pg": "^5.22.0",
     "@prisma/client": "^5.22.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
     "groq-sdk": "^1.2.1",
     "lucide-react": "^0.469.0",
-    "pg": "^8.11.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0"
   }
