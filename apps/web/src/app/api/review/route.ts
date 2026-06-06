@@ -1,26 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
-
-// ─── In-memory cache (survives across requests within the same server process) ──
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-const analysisCache = new Map<
-  string,
-  { data: any; timestamp: number }
->();
-
-function getCached(repo: string) {
-  const entry = analysisCache.get(repo);
-  if (!entry) return null;
-  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
-    analysisCache.delete(repo);
-    return null;
-  }
-  return entry.data;
-}
-
-function setCache(repo: string, data: any) {
-  analysisCache.set(repo, { data, timestamp: Date.now() });
-}
+import { prisma } from "@/lib/prisma";
 
 // ─── Helper: safe GitHub fetch (returns null on failure) ─────────────────────
 async function ghFetch(url: string) {
@@ -45,15 +25,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Return cached result unless force-refresh ──
-    if (!force) {
-      const cached = getCached(repo);
-      if (cached) {
-        return NextResponse.json({ repo, analysis: cached, cached: true });
-      }
+    const [owner, repoName] = repo.split("/");
+
+    // ── 0. Fetch recent commits to get latest SHA ──
+    const commits = await ghFetch(
+      `https://api.github.com/repos/${owner}/${repoName}/commits?per_page=5`
+    );
+    let recentCommits = "Not available.";
+    const latestCommitSha = Array.isArray(commits) && commits.length > 0 ? commits[0].sha : "unknown";
+
+    if (Array.isArray(commits) && commits.length > 0) {
+      recentCommits = commits
+        .map(
+          (c: any) =>
+            `- "${c.commit?.message?.split("\\n")[0] || "no message"}" by ${c.commit?.author?.name || "unknown"} on ${c.commit?.author?.date?.slice(0, 10) || "?"}`
+        )
+        .join("\\n");
     }
 
-    const [owner, repoName] = repo.split("/");
+    // ── Check Database Cache ──
+    if (!force) {
+      try {
+        const dbCache = await prisma.repoAnalysis.findUnique({
+          where: { repo }
+        });
+        if (dbCache && dbCache.commitSha === latestCommitSha) {
+          return NextResponse.json({ repo, analysis: dbCache.analysis, cached: true, commitSha: latestCommitSha });
+        }
+      } catch (err) {
+        console.warn("Prisma cache error:", err);
+      }
+    }
 
     // ── 1. Fetch README ──
     let readmeContent = "README not found.";
@@ -112,31 +114,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── 5. Fetch recent commits (last 5) ──
-    const commits = await ghFetch(
-      `https://api.github.com/repos/${owner}/${repoName}/commits?per_page=5`
-    );
-    let recentCommits = "Not available.";
-    if (Array.isArray(commits) && commits.length > 0) {
-      recentCommits = commits
-        .map(
-          (c: any) =>
-            `- "${c.commit?.message?.split("\n")[0] || "no message"}" by ${c.commit?.author?.name || "unknown"} on ${c.commit?.author?.date?.slice(0, 10) || "?"}`
-        )
-        .join("\n");
-    }
+    // ── 5. Fetch recent commits (already fetched in step 0) ──
+    // The commits have already been formatted into recentCommits.
 
-    // ── 6. Fetch directory tree (top-level) ──
+    // ── 6. Fetch directory tree (top-level & deep scans) ──
     const defaultBranch = repoInfo.default_branch || "main";
-    const tree = await ghFetch(
+    const treeTop = await ghFetch(
       `https://api.github.com/repos/${owner}/${repoName}/git/trees/${defaultBranch}?recursive=0`
     );
     let fileStructure = "Not available.";
-    if (tree && Array.isArray(tree.tree)) {
-      fileStructure = tree.tree
+    if (treeTop && Array.isArray(treeTop.tree)) {
+      fileStructure = treeTop.tree
         .slice(0, 40)
         .map((f: any) => `${f.type === "tree" ? "📁" : "📄"} ${f.path}`)
         .join("\n");
+    }
+
+    // Deep scan for workflows and tests (limit size of output)
+    let hasWorkflows = false;
+    let hasTests = false;
+    const treeDeep = await ghFetch(
+      `https://api.github.com/repos/${owner}/${repoName}/git/trees/${defaultBranch}?recursive=1`
+    );
+    if (treeDeep && Array.isArray(treeDeep.tree)) {
+      const paths = treeDeep.tree.map((t: any) => t.path);
+      hasWorkflows = paths.some((p: string) => p.includes(".github/workflows"));
+      hasTests = paths.some((p: string) => p.includes(".test.") || p.includes(".spec.") || p.includes("__tests__"));
+    }
+
+    // ── 6b. Fetch recent issues ──
+    const issuesData = await ghFetch(
+      `https://api.github.com/repos/${owner}/${repoName}/issues?state=open&per_page=3`
+    );
+    let recentIssues = "No recent issues fetched.";
+    if (Array.isArray(issuesData) && issuesData.length > 0) {
+      recentIssues = issuesData.map((i: any) => `- [${i.state}] ${i.title}`).join("\n");
     }
 
     // ── 7. Contributor count ──
@@ -173,9 +185,10 @@ export async function POST(req: NextRequest) {
 
     let code_structure = 30;
     const fsLower = fileStructure.toLowerCase();
-    if (fsLower.includes("src") || fsLower.includes("app") || fsLower.includes("lib")) code_structure += 30;
-    if (packageJson !== "Not found." || fsLower.includes("requirements.txt") || fsLower.includes("cargo.toml")) code_structure += 20;
-    if (fsLower.includes(".eslintrc") || fsLower.includes("tsconfig.json") || fsLower.includes(".gitignore")) code_structure += 20;
+    if (fsLower.includes("src") || fsLower.includes("app") || fsLower.includes("lib")) code_structure += 20;
+    if (packageJson !== "Not found." || fsLower.includes("requirements.txt") || fsLower.includes("cargo.toml")) code_structure += 10;
+    if (fsLower.includes(".eslintrc") || fsLower.includes("tsconfig.json") || fsLower.includes(".gitignore")) code_structure += 10;
+    if (hasTests) code_structure += 30; // Strong bonus for having tests
 
     let activity = 0;
     if (recentCommits !== "Not available." && recentCommits.split("\\n").length > 2) activity += 30;
@@ -193,9 +206,10 @@ export async function POST(req: NextRequest) {
     if (fsLower.includes("docs") || fsLower.includes("contributing")) documentation += 20;
 
     let security = 50;
-    if (fsLower.includes(".env.example")) security += 20;
+    if (fsLower.includes(".env.example")) security += 10;
     if (fsLower.includes(".env") && !fsLower.includes(".env.example")) security -= 40;
-    if (fsLower.includes("package-lock.json") || fsLower.includes("yarn.lock") || fsLower.includes("pnpm-lock.yaml")) security += 30;
+    if (fsLower.includes("package-lock.json") || fsLower.includes("yarn.lock") || fsLower.includes("pnpm-lock.yaml")) security += 20;
+    if (hasWorkflows) security += 20; // CI/CD improves security
 
     let originality = repoInfo.fork ? 20 : 50;
     if (!repoInfo.fork) {
@@ -246,6 +260,12 @@ ${fileStructure}
 
 RECENT COMMITS:
 ${recentCommits}
+
+RECENT ISSUES:
+${recentIssues}
+
+HAS CI/CD WORKFLOWS: ${hasWorkflows ? "Yes" : "No"}
+HAS AUTOMATED TESTS: ${hasTests ? "Yes" : "No"}
 
 README (first 3000 chars):
 ${readmeContent}
@@ -336,10 +356,25 @@ Return ONLY valid JSON with no markdown, no backticks, no explanation. Exactly t
     analysis.health_score = calculated_health_score;
     analysis.dimension_scores = calculated_dimension_scores;
 
-    // Cache the result
-    setCache(repo, analysis);
+    // Cache the result in Prisma Database
+    try {
+      await prisma.repoAnalysis.upsert({
+        where: { repo },
+        update: {
+          commitSha: latestCommitSha,
+          analysis: analysis
+        },
+        create: {
+          repo,
+          commitSha: latestCommitSha,
+          analysis: analysis
+        }
+      });
+    } catch (err) {
+      console.warn("Failed to save to Prisma db cache:", err);
+    }
 
-    return NextResponse.json({ repo, analysis });
+    return NextResponse.json({ repo, analysis, commitSha: latestCommitSha });
 
   } catch (error: any) {
     console.error("Review error:", error);

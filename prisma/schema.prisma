@@ -31,3 +31,13 @@ model PrReview {
   userId      String?
   user        User?    @relation(fields: [userId], references: [id])
 }
+
+// 3. The AI Repository Health Analysis Cache
+model RepoAnalysis {
+  id          String   @id @default(cuid())
+  repo        String   @unique // e.g., "Surya270106/PRism-AI"
+  commitSha   String   // The latest commit SHA when this was analyzed
+  analysis    Json     // The complete AI analysis output
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
