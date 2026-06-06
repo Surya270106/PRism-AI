@@ -4,20 +4,20 @@ import { useSession, signIn } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
 
-const fadeUp = {
+const fadeUp: any = {
   hidden: { opacity: 0, y: 22 },
-  visible: (delay = 0) => ({
+  visible: (delay: number = 0) => ({
     opacity: 1, y: 0,
     transition: { duration: 0.7, delay, ease: [0.23, 1, 0.32, 1] },
   }),
 };
 
-const stagger = {
+const stagger: any = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.08 } },
 };
 
-const cardReveal = {
+const cardReveal: any = {
   hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.23, 1, 0.32, 1] } },
 };

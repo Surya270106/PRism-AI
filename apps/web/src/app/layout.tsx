@@ -4,6 +4,8 @@ import "./globals.css";
 import { AuthProvider } from "../components/providers/auth-provider";
 import { Toaster } from "sonner";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: "PRism AI | Smart Reviews",
   description: "Automated PR reviews using AI.",

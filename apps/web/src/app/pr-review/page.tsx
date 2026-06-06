@@ -7,9 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 const GOLD = "#c9a84c";
 const GOLD_LIGHT = "#e8c87a";
 const DARK_BG = "#060606";
-const SPRING_EASE = [0.23, 1, 0.32, 1];
+const SPRING_EASE: any = [0.23, 1, 0.32, 1];
 
-const fadeUp = {
+const fadeUp: any = {
   hidden: { opacity: 0, y: 20 },
   visible: (delay = 0) => ({
     opacity: 1, y: 0,
@@ -17,12 +17,12 @@ const fadeUp = {
   })
 };
 
-const staggerContainer = {
+const staggerContainer: any = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.05 } }
 };
 
-const childFadeUp = {
+const childFadeUp: any = {
   hidden: { opacity: 0, y: 14 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: SPRING_EASE } }
 };
