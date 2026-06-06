@@ -48,9 +48,19 @@ interface PullRequest {
   html_url: string;
 }
 
+interface DimensionScores {
+  readme_quality: number;
+  code_structure: number;
+  activity: number;
+  documentation: number;
+  security: number;
+  originality: number;
+}
+
 interface RepoAnalysis {
   summary: string;
-  risk_score: number;
+  health_score: number;
+  dimension_scores?: DimensionScores;
   bugs: string[];
   security: string[];
   performance: string[];
@@ -68,8 +78,9 @@ interface PRReview {
 }
 
 function ScoreRing({ score }: { score: number }) {
-  const color = score >= 75 ? "#e74c3c" : score >= 50 ? "#f39c12" : score >= 25 ? GOLD : "#2ecc71";
-  const label = score >= 75 ? "Critical Risk" : score >= 50 ? "High Risk" : score >= 25 ? "Medium Risk" : "Healthy";
+  // Higher = better (health score)
+  const color = score >= 75 ? "#2ecc71" : score >= 50 ? GOLD : score >= 25 ? "#f39c12" : "#e74c3c";
+  const label = score >= 75 ? "Excellent" : score >= 50 ? "Good" : score >= 25 ? "Fair" : "Poor";
   const circumference = 2 * Math.PI * 40;
   return (
     <div className="flex flex-col items-center justify-center p-6 rounded-xl border border-white/10 bg-white/[0.02]">
@@ -88,7 +99,7 @@ function ScoreRing({ score }: { score: number }) {
         </div>
       </div>
       <span className="text-xs font-mono font-bold tracking-widest" style={{ color }}>{label}</span>
-      <span className="text-[10px] font-mono text-white/30 mt-0.5 uppercase tracking-widest">Risk Score</span>
+      <span className="text-[10px] font-mono text-white/30 mt-0.5 uppercase tracking-widest">Health Score</span>
     </div>
   );
 }
@@ -153,13 +164,13 @@ export default function PRReviewPage() {
     fetchPRs(selectedRepo.full_name);
   }, [selectedRepo]);
 
-  async function analyzeRepo(fullName: string) {
+  async function analyzeRepo(fullName: string, force = false) {
     setAnalyzingRepo(true);
     try {
       const res = await fetch("/api/review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo: fullName }),
+        body: JSON.stringify({ repo: fullName, force }),
       });
       const data = await res.json();
       if (data.analysis) setRepoAnalysis(data.analysis);
@@ -405,7 +416,7 @@ export default function PRReviewPage() {
                               <p className="text-[10px] font-mono uppercase tracking-widest text-white/30 mb-3">Overall Assessment</p>
                               <p className="text-sm text-white/75 leading-relaxed border-l-2 border-amber-500/40 pl-4">{repoAnalysis.summary}</p>
                             </div>
-                            <ScoreRing score={repoAnalysis.risk_score} />
+                            <ScoreRing score={repoAnalysis.health_score} />
                           </motion.div>
 
                           {/* Bugs + Security */}
@@ -491,7 +502,7 @@ export default function PRReviewPage() {
 
                           <motion.div variants={childFadeUp}>
                             <button
-                              onClick={() => analyzeRepo(selectedRepo.full_name)}
+                              onClick={() => analyzeRepo(selectedRepo.full_name, true)}
                               className="text-[10px] font-mono text-white/20 hover:text-white/50 transition-colors uppercase tracking-widest"
                             >
                               ↺ Re-run analysis

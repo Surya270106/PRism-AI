@@ -2,9 +2,19 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 
+interface DimensionScores {
+  readme_quality: number;
+  code_structure: number;
+  activity: number;
+  documentation: number;
+  security: number;
+  originality: number;
+}
+
 interface Analysis {
   summary: string;
-  risk_score: number;
+  health_score: number;
+  dimension_scores?: DimensionScores;
   bugs: string[];
   security: string[];
   performance: string[];
@@ -20,7 +30,9 @@ function ReviewContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const runReview = () => {
+  const [forceRefresh, setForceRefresh] = useState(false);
+
+  const runReview = (force = false) => {
     if (!repo) return;
     setLoading(true);
     setAnalysis(null);
@@ -28,7 +40,7 @@ function ReviewContent() {
     fetch("/api/review", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ repo }),
+      body: JSON.stringify({ repo, force }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -41,23 +53,24 @@ function ReviewContent() {
 
   useEffect(() => { runReview(); }, [repo]);
 
-  const riskColor =
+  // Higher = better (health score)
+  const scoreColor =
     !analysis ? "" :
-    analysis.risk_score >= 75 ? "text-red-400" :
-    analysis.risk_score >= 50 ? "text-orange-400" :
-    analysis.risk_score >= 25 ? "text-yellow-400" : "text-green-400";
+    analysis.health_score >= 75 ? "text-green-400" :
+    analysis.health_score >= 50 ? "text-yellow-400" :
+    analysis.health_score >= 25 ? "text-orange-400" : "text-red-400";
 
-  const riskBg =
+  const scoreBg =
     !analysis ? "" :
-    analysis.risk_score >= 75 ? "border-red-800 bg-red-950/40" :
-    analysis.risk_score >= 50 ? "border-orange-800 bg-orange-950/40" :
-    analysis.risk_score >= 25 ? "border-yellow-800 bg-yellow-950/40" : "border-green-800 bg-green-950/40";
+    analysis.health_score >= 75 ? "border-green-800 bg-green-950/40" :
+    analysis.health_score >= 50 ? "border-yellow-800 bg-yellow-950/40" :
+    analysis.health_score >= 25 ? "border-orange-800 bg-orange-950/40" : "border-red-800 bg-red-950/40";
 
-  const riskLabel =
+  const scoreLabel =
     !analysis ? "" :
-    analysis.risk_score >= 75 ? "Critical Risk" :
-    analysis.risk_score >= 50 ? "High Risk" :
-    analysis.risk_score >= 25 ? "Medium Risk" : "Low Risk";
+    analysis.health_score >= 75 ? "Excellent" :
+    analysis.health_score >= 50 ? "Good" :
+    analysis.health_score >= 25 ? "Fair" : "Poor";
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white">
@@ -107,18 +120,18 @@ function ReviewContent() {
                 <p className="text-xs text-zinc-500 uppercase tracking-widest mb-3">AI Summary</p>
                 <p className="text-zinc-100 leading-relaxed text-sm">{analysis.summary}</p>
               </div>
-              <div className={`rounded-2xl border p-6 flex flex-col items-center justify-center ${riskBg}`}>
-                <p className="text-xs text-zinc-500 uppercase tracking-widest mb-3">Risk Score</p>
-                <p className={`text-7xl font-bold ${riskColor}`}>{analysis.risk_score}</p>
-                <p className={`mt-2 text-sm font-semibold ${riskColor}`}>{riskLabel}</p>
+              <div className={`rounded-2xl border p-6 flex flex-col items-center justify-center ${scoreBg}`}>
+                <p className="text-xs text-zinc-500 uppercase tracking-widest mb-3">Health Score</p>
+                <p className={`text-7xl font-bold ${scoreColor}`}>{analysis.health_score}</p>
+                <p className={`mt-2 text-sm font-semibold ${scoreColor}`}>{scoreLabel}</p>
                 <div className="mt-4 w-full bg-zinc-800 rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all ${
-                      analysis.risk_score >= 75 ? "bg-red-500" :
-                      analysis.risk_score >= 50 ? "bg-orange-500" :
-                      analysis.risk_score >= 25 ? "bg-yellow-500" : "bg-green-500"
+                      analysis.health_score >= 75 ? "bg-green-500" :
+                      analysis.health_score >= 50 ? "bg-yellow-500" :
+                      analysis.health_score >= 25 ? "bg-orange-500" : "bg-red-500"
                     }`}
-                    style={{ width: `${analysis.risk_score}%` }}
+                    style={{ width: `${analysis.health_score}%` }}
                   />
                 </div>
               </div>
@@ -201,7 +214,7 @@ function ReviewContent() {
 
             <div className="flex gap-3 pt-2">
               <button
-                onClick={runReview}
+                onClick={() => runReview(true)}
                 className="bg-white text-black px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition"
               >
                 Re-run Analysis

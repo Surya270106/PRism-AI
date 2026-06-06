@@ -15,15 +15,17 @@ export function formatDate(date: string | Date): string {
 }
 
 export function getRiskColor(score: number): string {
-  if (score >= 75) return "text-red-400";
+  // Health score: higher = better
+  if (score >= 75) return "text-green-400";
   if (score >= 50) return "text-yellow-400";
-  if (score >= 25) return "text-blue-400";
-  return "text-green-400";
+  if (score >= 25) return "text-orange-400";
+  return "text-red-400";
 }
 
 export function getRiskLabel(score: number): string {
-  if (score >= 75) return "Critical";
-  if (score >= 50) return "High";
-  if (score >= 25) return "Medium";
-  return "Low";
+  // Health score: higher = better
+  if (score >= 75) return "Excellent";
+  if (score >= 50) return "Good";
+  if (score >= 25) return "Fair";
+  return "Poor";
 }
