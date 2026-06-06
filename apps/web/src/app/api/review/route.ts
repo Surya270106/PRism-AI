@@ -162,7 +162,68 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Build the structured prompt with scoring rubric ──
+    // ── Deterministic Scoring Criteria ──
+    let readme_quality = 0;
+    if (readmeContent && readmeContent !== "README not found.") {
+      readme_quality += 40;
+      if (readmeContent.length > 500) readme_quality += 20;
+      if (readmeContent.length > 1500) readme_quality += 20;
+      if (readmeContent.length > 2500) readme_quality += 20;
+    }
+
+    let code_structure = 30;
+    const fsLower = fileStructure.toLowerCase();
+    if (fsLower.includes("src") || fsLower.includes("app") || fsLower.includes("lib")) code_structure += 30;
+    if (packageJson !== "Not found." || fsLower.includes("requirements.txt") || fsLower.includes("cargo.toml")) code_structure += 20;
+    if (fsLower.includes(".eslintrc") || fsLower.includes("tsconfig.json") || fsLower.includes(".gitignore")) code_structure += 20;
+
+    let activity = 0;
+    if (recentCommits !== "Not available." && recentCommits.split("\\n").length > 2) activity += 30;
+    if (repoInfo.pushed_at) {
+      const daysSincePush = (Date.now() - new Date(repoInfo.pushed_at).getTime()) / (1000 * 3600 * 24);
+      if (daysSincePush < 30) activity += 50;
+      else if (daysSincePush < 180) activity += 30;
+      else if (daysSincePush < 365) activity += 10;
+    }
+    if ((repoInfo.open_issues_count || 0) < 20) activity += 20;
+
+    let documentation = 20;
+    if (readmeContent !== "README not found.") documentation += 40;
+    if (repoInfo.license) documentation += 20;
+    if (fsLower.includes("docs") || fsLower.includes("contributing")) documentation += 20;
+
+    let security = 50;
+    if (fsLower.includes(".env.example")) security += 20;
+    if (fsLower.includes(".env") && !fsLower.includes(".env.example")) security -= 40;
+    if (fsLower.includes("package-lock.json") || fsLower.includes("yarn.lock") || fsLower.includes("pnpm-lock.yaml")) security += 30;
+
+    let originality = repoInfo.fork ? 20 : 50;
+    if (!repoInfo.fork) {
+      if ((repoInfo.stargazers_count || 0) > 10) originality += 20;
+      if ((repoInfo.stargazers_count || 0) > 100) originality += 30;
+    } else {
+      if ((repoInfo.stargazers_count || 0) > 50) originality += 30;
+    }
+
+    const calculated_dimension_scores = {
+      readme_quality: Math.min(100, Math.max(0, readme_quality)),
+      code_structure: Math.min(100, Math.max(0, code_structure)),
+      activity: Math.min(100, Math.max(0, activity)),
+      documentation: Math.min(100, Math.max(0, documentation)),
+      security: Math.min(100, Math.max(0, security)),
+      originality: Math.min(100, Math.max(0, originality)),
+    };
+
+    const calculated_health_score = Math.round(
+      (calculated_dimension_scores.readme_quality * 0.20) +
+      (calculated_dimension_scores.code_structure * 0.20) +
+      (calculated_dimension_scores.activity * 0.15) +
+      (calculated_dimension_scores.documentation * 0.15) +
+      (calculated_dimension_scores.security * 0.15) +
+      (calculated_dimension_scores.originality * 0.15)
+    );
+
+    // ── Build the structured prompt with calculated scores ──
     const prompt = `You are an expert software engineer and technical recruiter evaluating a GitHub repository.
 
 REPOSITORY DATA:
@@ -192,28 +253,20 @@ ${readmeContent}
 package.json:
 ${packageJson}
 
-SCORING RUBRIC — Score each dimension from 0 to 100:
-1. README Quality (weight 20%): Does it clearly explain what the project does, installation steps, usage examples, and screenshots/demos? A missing README scores 0.
-2. Code Structure (weight 20%): Is there a clear folder structure with separation of concerns? Are there config files (linting, CI, testing)? Or is everything in one flat directory?
-3. Activity & Maintenance (weight 15%): How recent are the commits? Are there multiple contributors? Is the project actively maintained or abandoned?
-4. Documentation & Testing (weight 15%): Are there comments, API docs, contribution guidelines, a LICENSE file? Are there test files or CI configurations?
-5. Security Practices (weight 15%): Is there a .env.example (not a committed .env)? Are dependencies well-managed? Any obvious secrets or vulnerabilities?
-6. Originality & Effort (weight 15%): Is this an original project or a tutorial clone/fork? Does it solve a real problem? Is there meaningful custom code?
+I have already calculated the numeric scores for this repository based on a strict deterministic rubric:
+Health Score: ${calculated_health_score}/100
+Dimension Scores:
+- README Quality: ${calculated_dimension_scores.readme_quality}/100
+- Code Structure: ${calculated_dimension_scores.code_structure}/100
+- Activity: ${calculated_dimension_scores.activity}/100
+- Documentation: ${calculated_dimension_scores.documentation}/100
+- Security: ${calculated_dimension_scores.security}/100
+- Originality: ${calculated_dimension_scores.originality}/100
 
-IMPORTANT: Compute health_score as the WEIGHTED AVERAGE of the 6 dimension scores. Round to the nearest integer. A score of 100 = excellent, 0 = terrible.
-
+Based on the provided data and these scores, generate a textual review. 
 Return ONLY valid JSON with no markdown, no backticks, no explanation. Exactly this shape:
 {
   "summary": "2-3 sentence overall assessment of the repository quality from a recruiter's perspective",
-  "health_score": <integer 0-100, weighted average of the 6 dimensions>,
-  "dimension_scores": {
-    "readme_quality": <0-100>,
-    "code_structure": <0-100>,
-    "activity": <0-100>,
-    "documentation": <0-100>,
-    "security": <0-100>,
-    "originality": <0-100>
-  },
   "bugs": ["concrete bug or issue found, based on actual code/config evidence"],
   "security": ["specific security concern found in the repo"],
   "performance": ["specific performance issue or improvement"],
@@ -258,13 +311,7 @@ Return ONLY valid JSON with no markdown, no backticks, no explanation. Exactly t
     let analysis;
     try {
       analysis = JSON.parse(cleaned);
-
-      // Validate and clamp health_score
-      if (typeof analysis.health_score !== "number" || isNaN(analysis.health_score)) {
-        analysis.health_score = 50;
-      }
-      analysis.health_score = Math.max(0, Math.min(100, Math.round(analysis.health_score)));
-
+      
       // Ensure all arrays exist
       analysis.bugs = Array.isArray(analysis.bugs) ? analysis.bugs : [];
       analysis.security = Array.isArray(analysis.security) ? analysis.security : [];
@@ -272,31 +319,10 @@ Return ONLY valid JSON with no markdown, no backticks, no explanation. Exactly t
       analysis.architecture = Array.isArray(analysis.architecture) ? analysis.architecture : [];
       analysis.positives = Array.isArray(analysis.positives) ? analysis.positives : [];
       analysis.recommendations = Array.isArray(analysis.recommendations) ? analysis.recommendations : [];
-
-      // Ensure dimension_scores exist
-      if (!analysis.dimension_scores || typeof analysis.dimension_scores !== "object") {
-        analysis.dimension_scores = {
-          readme_quality: 50,
-          code_structure: 50,
-          activity: 50,
-          documentation: 50,
-          security: 50,
-          originality: 50,
-        };
-      }
     } catch {
       // Fallback if LLM returns garbage
       analysis = {
         summary: `${repoName} is a ${repoInfo.language ?? "code"} repository with ${repoInfo.stargazers_count ?? 0} stars. Could not fully parse AI response — review below is approximate.`,
-        health_score: 50,
-        dimension_scores: {
-          readme_quality: readmeContent !== "README not found." ? 50 : 10,
-          code_structure: 50,
-          activity: 50,
-          documentation: 50,
-          security: 50,
-          originality: 50,
-        },
         bugs: ["Could not parse AI response — manual review recommended"],
         security: ["Audit dependencies", "Check for exposed secrets"],
         performance: ["Consider adding caching", "Optimize build pipeline"],
@@ -305,6 +331,10 @@ Return ONLY valid JSON with no markdown, no backticks, no explanation. Exactly t
         recommendations: ["Add CI/CD pipeline", "Add test coverage", "Add contribution guidelines"],
       };
     }
+
+    // Attach the deterministic scores
+    analysis.health_score = calculated_health_score;
+    analysis.dimension_scores = calculated_dimension_scores;
 
     // Cache the result
     setCache(repo, analysis);
