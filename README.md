@@ -99,6 +99,24 @@ cp apps/web/.env.example apps/web/.env.local
 npm run dev
 ```
 
+### Running with Docker (Recommended for Production)
+
+PRism AI is fully containerized and includes a `docker-compose.yml` that provisions both the Next.js application and a PostgreSQL database.
+
+```bash
+# Clone the repo
+git clone https://github.com/Surya270106/PRism-AI.git
+cd PRism-AI
+
+# Set up environment variables
+cp apps/web/.env.example apps/web/.env.local
+# Add your required tokens (e.g., HF_TOKEN, GITHUB_ID, GITHUB_SECRET)
+
+# Build and start the containers
+docker compose up -d --build
+```
+The application will be available at `http://localhost:3000`. Database migrations run automatically during startup.
+
 ---
 
 ## Roadmap
