@@ -2,37 +2,45 @@
 > web@0.1.0 build
 > next build
 
-⚠ `eslint` configuration in next.config.ts is no longer supported. See more info here: https://nextjs.org/docs/app/api-reference/cli/next#next-lint-options
-⚠ Invalid next.config.ts options detected: 
-⚠     Unrecognized key(s) in object: 'eslint'
-⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
-▲ Next.js 16.2.6 (Turbopack)
-- Environments: .env.local
+   ▲ Next.js 15.5.18
+   - Environments: .env.local
 
-  Creating an optimized production build ...
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 39.5s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/7) ...
+   Generating static pages (1/7) 
+   Generating static pages (3/7) 
+   Generating static pages (5/7) 
+ ✓ Generating static pages (7/7)
+   Finalizing page optimization ...
+   Collecting build traces ...
 
-> Build error occurred
-Error: Turbopack build failed with 1 errors:
-./apps/web/src/app/page.tsx:332:16
-Expected ';', '}' or <eof>
-  [90m330 |[0m   );
-  [90m331 |[0m }
-[31m[1m>[0m [90m332 |[0m page.tsk, give me the steps to [36mdo[0m it [36min[0m y porject
-  [90m    |[0m                [31m[1m^^[0m
+Route (app)                                 Size  First Load JS
+┌ ƒ /                                    8.44 kB         161 kB
+├ ƒ /_not-found                            140 B         103 kB
+├ ƒ /api/auth/[...nextauth]                140 B         103 kB
+├ ƒ /api/pr-review                         140 B         103 kB
+├ ƒ /api/prs                               140 B         103 kB
+├ ƒ /api/repos                             140 B         103 kB
+├ ƒ /api/repos/pulls                       140 B         103 kB
+├ ƒ /api/review                            140 B         103 kB
+├ ƒ /dashboard                           3.16 kB         156 kB
+├ ƒ /history                             3.33 kB         150 kB
+├ ƒ /pr-review                           10.7 kB         163 kB
+├ ƒ /review                              2.01 kB         104 kB
+└ ƒ /settings                            5.67 kB         158 kB
++ First Load JS shared by all             102 kB
+  ├ chunks/255-4f6f48eb65b9717e.js       46.2 kB
+  ├ chunks/4bd1b696-c023c6e3521b1417.js  54.2 kB
+  └ other shared chunks (total)             2 kB
 
-Parsing ecmascript source code failed
 
+ƒ  (Dynamic)  server-rendered on demand
 
-    at <unknown> (./apps/web/src/app/page.tsx:332:16)
-npm error Lifecycle script `build` failed with error:
-npm error code 1
-npm error path D:\Prism\prism-ai\apps\web
-npm error workspace web@0.1.0
-npm error location D:\Prism\prism-ai\apps\web
-npm error command failed
-npm error command C:\Windows\system32\cmd.exe /d /s /c next build
 npm notice
-npm notice New minor version of npm available! 11.13.0 -> 11.16.0
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.16.0
-npm notice To update run: npm install -g npm@11.16.0
+npm notice New minor version of npm available! 11.13.0 -> 11.17.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.17.0
+npm notice To update run: npm install -g npm@11.17.0
 npm notice

@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+.git
+.gitignore
+README.md
+.next
+.turbo
+apps/web/.next
+apps/web/.turbo
+packages/**/node_modules
+apps/**/node_modules
