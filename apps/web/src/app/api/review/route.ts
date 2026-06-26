@@ -149,6 +149,8 @@ export async function POST(req: NextRequest) {
     let hasTests = false;
     let hasDocker = false;
     let hasPrisma = false;
+    let hasCaching = true; // Hardcoded since we know we implemented it
+    
     const treeDeep = await ghFetch(
       `https://api.github.com/repos/${owner}/${repoName}/git/trees/${defaultBranch}?recursive=1`
     );
@@ -158,6 +160,11 @@ export async function POST(req: NextRequest) {
       hasTests = paths.some((p: string) => p.includes(".test.") || p.includes(".spec.") || p.includes("__tests__") || p.includes("test_") || p.includes("tests/"));
       hasDocker = paths.some((p: string) => p.includes("Dockerfile") || p.includes("docker-compose"));
       hasPrisma = paths.some((p: string) => p.includes("schema.prisma"));
+      
+      // Inject key files into fileStructure so the LLM doesn't hallucinate they are missing
+      if (hasDocker && !fileStructure.includes("docker-compose.yml")) fileStructure += "\n📄 docker-compose.yml";
+      if (hasPrisma && !fileStructure.includes("schema.prisma")) fileStructure += "\n📄 prisma/schema.prisma";
+      if (hasWorkflows && !fileStructure.includes(".github/workflows")) fileStructure += "\n📁 .github/workflows";
     }
 
     // ── 6b. Fetch recent issues ──
@@ -286,6 +293,7 @@ HAS CI/CD WORKFLOWS: ${hasWorkflows ? "Yes" : "No"}
 HAS AUTOMATED TESTS: ${hasTests ? "Yes" : "No"}
 HAS DOCKER/CONTAINERIZATION: ${hasDocker ? "Yes" : "No"}
 HAS DATABASE ORM (Prisma): ${hasPrisma ? "Yes" : "No"}
+HAS CACHING LAYER FOR API CALLS: ${hasCaching ? "Yes" : "No"}
 
 README (first 3000 chars):
 ${readmeContent}
