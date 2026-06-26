@@ -324,7 +324,8 @@ Return ONLY valid JSON with no markdown, no backticks, no explanation. Exactly t
   "architecture": ["specific architectural suggestion based on the file structure"],
   "positives": ["specific strength observed in the repo"],
   "recommendations": ["actionable next step to improve the repo"]
-}`;
+}
+If the repository is empty or lacks information, you MUST still return this exact JSON structure with generic advice based on the language. DO NOT return plain text.`;
 
     const response = await fetch(
       "https://router.huggingface.co/v1/chat/completions",
@@ -335,7 +336,7 @@ Return ONLY valid JSON with no markdown, no backticks, no explanation. Exactly t
           "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
-          model: "moonshotai/Kimi-K2-Instruct-0905",
+          model: "meta-llama/Meta-Llama-3-8B-Instruct",
           messages: [{ role: "user", content: prompt }],
           max_tokens: 1024,
           temperature: 0,
