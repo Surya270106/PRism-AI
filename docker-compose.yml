@@ -46,11 +46,49 @@ services:
       - HF_TOKEN=${HF_TOKEN:-}
       - GITHUB_ID=${GITHUB_ID:-}
       - GITHUB_SECRET=${GITHUB_SECRET:-}
+      - ORCHESTRATOR_URL=http://orchestrator:8001/api/v1/review
     depends_on:
       db-setup:
         condition: service_completed_successfully
       db:
         condition: service_healthy
+      orchestrator:
+        condition: service_started
+
+  orchestrator:
+    image: python:3.11-slim
+    container_name: prism-orchestrator
+    restart: always
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8001:8001"
+    environment:
+      - USE_LOCAL_MODEL=true
+      - USE_CLAUDE_FALLBACK=true
+      - LLAMA_SERVER_URL=http://inference:8000/review
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    command: >
+      sh -c "pip install -r apps/orchestrator/requirements.txt && 
+             python apps/orchestrator/main.py"
+    depends_on:
+      - inference
+
+  inference:
+    image: python:3.11-slim
+    container_name: prism-inference
+    restart: always
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=../training/checkpoints/prism-llama-3b_final
+    command: >
+      sh -c "pip install -r ml/inference/requirements.txt && 
+             python ml/inference/server.py"
 
 volumes:
   postgres_data:
