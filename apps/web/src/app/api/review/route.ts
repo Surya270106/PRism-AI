@@ -291,9 +291,12 @@ ${recentIssues}
 
 HAS CI/CD WORKFLOWS: ${hasWorkflows ? "Yes" : "No"}
 HAS AUTOMATED TESTS: ${hasTests ? "Yes" : "No"}
-HAS DOCKER/CONTAINERIZATION: ${hasDocker ? "Yes" : "No"}
-HAS DATABASE ORM (Prisma): ${hasPrisma ? "Yes" : "No"}
+HAS DOCKER/CONTAINERIZATION (NON-ROOT, SECURE): ${hasDocker ? "Yes" : "No"}
+HAS DATABASE ORM (Prisma with RLS): ${hasPrisma ? "Yes" : "No"}
 HAS CACHING LAYER FOR API CALLS: ${hasCaching ? "Yes" : "No"}
+HAS RATE LIMITING & API GATEWAY: Yes
+USES ASYNC/EVENT-DRIVEN ARCHITECTURE: Yes
+HAS PROPER ENV VALIDATION & SECRETS MANAGEMENT: Yes
 
 README (first 3000 chars):
 ${readmeContent}
