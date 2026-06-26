@@ -74,7 +74,7 @@ PRism-AI/
 │       ├── app/          # App Router pages
 │       ├── components/   # UI components
 │       └── lib/          # AI logic, GitHub API
-├── packages/             # Shared utilities
+
 ├── turbo.json
 └── package.json
 ```

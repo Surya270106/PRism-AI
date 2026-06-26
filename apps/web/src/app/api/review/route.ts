@@ -144,16 +144,20 @@ export async function POST(req: NextRequest) {
         .join("\n");
     }
 
-    // Deep scan for workflows and tests (limit size of output)
+    // Deep scan for workflows, tests, docker, and prisma
     let hasWorkflows = false;
     let hasTests = false;
+    let hasDocker = false;
+    let hasPrisma = false;
     const treeDeep = await ghFetch(
       `https://api.github.com/repos/${owner}/${repoName}/git/trees/${defaultBranch}?recursive=1`
     );
     if (treeDeep && Array.isArray(treeDeep.tree)) {
       const paths = treeDeep.tree.map((t: any) => t.path);
       hasWorkflows = paths.some((p: string) => p.includes(".github/workflows"));
-      hasTests = paths.some((p: string) => p.includes(".test.") || p.includes(".spec.") || p.includes("__tests__"));
+      hasTests = paths.some((p: string) => p.includes(".test.") || p.includes(".spec.") || p.includes("__tests__") || p.includes("test_") || p.includes("tests/"));
+      hasDocker = paths.some((p: string) => p.includes("Dockerfile") || p.includes("docker-compose"));
+      hasPrisma = paths.some((p: string) => p.includes("schema.prisma"));
     }
 
     // ── 6b. Fetch recent issues ──
@@ -280,6 +284,8 @@ ${recentIssues}
 
 HAS CI/CD WORKFLOWS: ${hasWorkflows ? "Yes" : "No"}
 HAS AUTOMATED TESTS: ${hasTests ? "Yes" : "No"}
+HAS DOCKER/CONTAINERIZATION: ${hasDocker ? "Yes" : "No"}
+HAS DATABASE ORM (Prisma): ${hasPrisma ? "Yes" : "No"}
 
 README (first 3000 chars):
 ${readmeContent}
