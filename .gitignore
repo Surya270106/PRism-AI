@@ -7,3 +7,11 @@ build
 .env.local
 
 /generated/prisma
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+
+# Turbo
+.turbo/
