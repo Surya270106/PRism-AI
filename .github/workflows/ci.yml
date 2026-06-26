@@ -31,9 +31,16 @@ jobs:
     - name: Build Next.js
       run: npm run build
       
-    - name: Python Syntax Check (Orchestrator)
+    - name: Install Python dependencies
       run: |
-        python -m py_compile apps/orchestrator/main.py
+        python -m pip install --upgrade pip
+        pip install pytest httpx
+        if [ -f apps/orchestrator/requirements.txt ]; then pip install -r apps/orchestrator/requirements.txt; fi
+
+    - name: Run Python Tests (Orchestrator)
+      run: |
+        export PYTHONPATH=$PYTHONPATH:$(pwd)
+        pytest apps/orchestrator/tests/
         python -m py_compile ml/inference/server.py
 
   security-scan:

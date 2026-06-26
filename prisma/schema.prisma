@@ -9,35 +9,40 @@ datasource db {
 
 // 1. NextAuth User Model
 model User {
-  id            String     @id @default(cuid())
-  name          String?
-  email         String?    @unique
-  image         String?
-  reviews       PrReview[]
+  id      String     @id @default(cuid())
+  name    String?
+  email   String?    @unique
+  image   String?
+  reviews PrReview[]
 }
 
 // 2. The AI PR Review Model
 model PrReview {
-  id          String   @id @default(cuid())
-  prId        String   // e.g., "PR-2847"
-  repo        String   // e.g., "Surya270106/PRism-AI"
-  title       String
-  riskScore   String   // "HIGH", "MED", "LOW"
-  summary     String
-  codeDiff    String?  // The raw code changes
-  fixes       String?  // The AI's suggested code fix
-  createdAt   DateTime @default(now())
-  
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
+  id        String   @id @default(cuid())
+  prId      String // e.g., "PR-2847"
+  repo      String // e.g., "Surya270106/PRism-AI"
+  title     String
+  riskScore String // "HIGH", "MED", "LOW"
+  summary   String
+  codeDiff  String? // The raw code changes
+  fixes     String? // The AI's suggested code fix
+  createdAt DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@index([repo])
+  @@index([userId])
 }
 
 // 3. The AI Repository Health Analysis Cache
 model RepoAnalysis {
-  id          String   @id @default(cuid())
-  repo        String   @unique // e.g., "Surya270106/PRism-AI"
-  commitSha   String   // The latest commit SHA when this was analyzed
-  analysis    Json     // The complete AI analysis output
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  repo      String   @unique // e.g., "Surya270106/PRism-AI"
+  commitSha String // The latest commit SHA when this was analyzed
+  analysis  Json // The complete AI analysis output
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([repo, commitSha])
 }

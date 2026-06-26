@@ -2,10 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { prisma } from "@/lib/prisma";
 
+// Simple memory cache for GitHub API calls
+const ghCache = new Map<string, { data: any, timestamp: number }>();
+const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
+
 // ─── Helper: safe GitHub fetch (returns null on failure) ─────────────────────
 async function ghFetch(url: string) {
+  const cached = ghCache.get(url);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  
   try {
-    const r = await axios.get(url, { timeout: 6000 });
+    const headers: Record<string, string> = {};
+    if (process.env.GITHUB_TOKEN) {
+      headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
+    const r = await axios.get(url, { timeout: 6000, headers });
+    ghCache.set(url, { data: r.data, timestamp: Date.now() });
     return r.data;
   } catch {
     return null;
@@ -62,14 +76,14 @@ export async function POST(req: NextRequest) {
     try {
       const r = await axios.get(
         `https://raw.githubusercontent.com/${owner}/${repoName}/main/README.md`,
-        { timeout: 5000 }
+        { timeout: 5000, headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {} }
       );
       readmeContent = String(r.data).slice(0, 3000);
     } catch {
       try {
         const r = await axios.get(
           `https://raw.githubusercontent.com/${owner}/${repoName}/master/README.md`,
-          { timeout: 5000 }
+          { timeout: 5000, headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {} }
         );
         readmeContent = String(r.data).slice(0, 3000);
       } catch {
@@ -82,7 +96,7 @@ export async function POST(req: NextRequest) {
     try {
       const r = await axios.get(
         `https://api.github.com/repos/${owner}/${repoName}`,
-        { timeout: 5000 }
+        { timeout: 5000, headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {} }
       );
       repoInfo = r.data;
     } catch {}
@@ -92,7 +106,7 @@ export async function POST(req: NextRequest) {
     try {
       const r = await axios.get(
         `https://raw.githubusercontent.com/${owner}/${repoName}/main/package.json`,
-        { timeout: 5000 }
+        { timeout: 5000, headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {} }
       );
       packageJson = JSON.stringify(r.data, null, 2).slice(0, 1500);
     } catch {}
@@ -156,7 +170,7 @@ export async function POST(req: NextRequest) {
     try {
       const r = await axios.get(
         `https://api.github.com/repos/${owner}/${repoName}/contributors?per_page=1&anon=true`,
-        { timeout: 5000 }
+        { timeout: 5000, headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {} }
       );
       // GitHub puts total page count in the Link header
       const linkHeader = r.headers?.link || "";
