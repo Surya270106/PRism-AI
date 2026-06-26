@@ -168,21 +168,29 @@ function ReviewContent() {
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                 <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Performance</p>
                 <ul className="space-y-2">
-                  {analysis.performance.map((p, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-200">
-                      <span className="text-yellow-400 mt-0.5 flex-shrink-0">●</span>{p}
-                    </li>
-                  ))}
+                  {analysis.performance && analysis.performance.length > 0 ? (
+                    analysis.performance.map((p, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-zinc-200">
+                        <span className="text-yellow-400 mt-0.5 flex-shrink-0">⚡</span>{p}
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-sm text-zinc-500">No major performance issues detected.</li>
+                  )}
                 </ul>
               </div>
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                 <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Architecture</p>
                 <ul className="space-y-2">
-                  {analysis.architecture.map((a, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-200">
-                      <span className="text-blue-400 mt-0.5 flex-shrink-0">●</span>{a}
-                    </li>
-                  ))}
+                  {analysis.architecture && analysis.architecture.length > 0 ? (
+                    analysis.architecture.map((a, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-zinc-200">
+                        <span className="text-blue-400 mt-0.5 flex-shrink-0">🏗️</span>{a}
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-sm text-zinc-500">Architecture looks standard.</li>
+                  )}
                 </ul>
               </div>
             </div>
@@ -190,25 +198,33 @@ function ReviewContent() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
               <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">What is Working Well</p>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                {analysis.positives.map((p, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm text-zinc-200">
-                    <span className="text-green-400 mt-0.5 flex-shrink-0">✓</span>{p}
-                  </div>
-                ))}
+                {analysis.positives && analysis.positives.length > 0 ? (
+                  analysis.positives.map((p, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm text-zinc-200">
+                      <span className="text-green-400 mt-0.5 flex-shrink-0">✅</span>{p}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-zinc-500">No major positives identified.</div>
+                )}
               </div>
             </div>
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
               <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">AI Recommendations</p>
               <ol className="space-y-3">
-                {analysis.recommendations.map((r, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-zinc-200">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs text-zinc-400 font-medium">
-                      {i + 1}
-                    </span>
-                    {r}
-                  </li>
-                ))}
+                {analysis.recommendations && analysis.recommendations.length > 0 ? (
+                  analysis.recommendations.map((r, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-zinc-200">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs text-zinc-400 font-medium">
+                        {i + 1}
+                      </span>
+                      <div className="pt-0.5">{r}</div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-sm text-zinc-500">No recommendations.</li>
+                )}
               </ol>
             </div>
 

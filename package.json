@@ -23,7 +23,6 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
