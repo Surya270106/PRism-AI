@@ -358,10 +358,17 @@ Return ONLY valid JSON with no markdown, no backticks, no explanation. Exactly t
       .replace(/```json/gi, "")
       .replace(/```/g, "")
       .trim();
+      
+    // Extract substring between first { and last } to handle conversational cruft
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    const jsonStr = (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) 
+      ? cleaned.substring(firstBrace, lastBrace + 1) 
+      : cleaned;
 
     let analysis;
     try {
-      analysis = JSON.parse(cleaned);
+      analysis = JSON.parse(jsonStr);
       
       // Ensure all arrays exist
       analysis.bugs = Array.isArray(analysis.bugs) ? analysis.bugs : [];
