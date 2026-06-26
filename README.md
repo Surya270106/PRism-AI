@@ -110,7 +110,7 @@ cd PRism-AI
 
 # Set up environment variables
 cp apps/web/.env.example apps/web/.env.local
-# Add your required tokens (e.g., HF_TOKEN, GITHUB_ID, GITHUB_SECRET)
+# Add your required tokens (e.g., GITHUB_ID, GITHUB_SECRET)
 
 # Build and start the containers
 docker compose up -d --build
