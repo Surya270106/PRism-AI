@@ -3,6 +3,7 @@
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { readApiResponse } from "@/lib/client-api";
 
 interface Repo {
   id: number;
@@ -39,14 +40,22 @@ export default function DashboardPage() {
   const [repos, setRepos]           = useState<Repo[]>([]);
   const [loading, setLoading]       = useState(false);
   const [search, setSearch]         = useState("");
+  const [error, setError]           = useState("");
+
+  const loadRepos = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await readApiResponse(await fetch("/api/repos"));
+      setRepos(Array.isArray(data.repos) ? data.repos as unknown as Repo[] : []);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to load repositories.");
+    } finally { setLoading(false); }
+  };
 
   useEffect(() => {
     if (!session) return;
-    setLoading(true);
-    fetch("/api/repos")
-      .then((r) => r.json())
-      .then((d) => { setRepos(Array.isArray(d) ? d : []); setLoading(false); })
-      .catch(() => setLoading(false));
+    void loadRepos();
   }, [session]);
 
   const filtered = repos.filter((r) =>
@@ -71,7 +80,7 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] as any }}
+          transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
           style={{ textAlign: "center", maxWidth: 400 }}
         >
           <div
@@ -313,6 +322,11 @@ export default function DashboardPage() {
           </div>
 
           {/* Repo grid */}
+          {error && !loading && (
+            <div style={{ padding: 16, marginBottom: 16, border: "1px solid rgba(231,76,60,.3)", color: "#e67c73", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
+              {error} <button onClick={() => void loadRepos()} style={{ marginLeft: 10, color: "#c9a84c", background: "none", border: 0, cursor: "pointer" }}>Retry</button>
+            </div>
+          )}
           {loading ? (
             <div style={{ textAlign: "center", padding: "60px 0" }}>
               <motion.div

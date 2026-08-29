@@ -27,6 +27,8 @@
         "GITHUB_ID",
         "GITHUB_SECRET",
         "GROQ_API_KEY",
+        "GROQ_MODEL",
+        "AI_PROVIDER",
         "HF_TOKEN",
         "ANTHROPIC_API_KEY"
       ],
@@ -36,6 +38,8 @@
       "cache": false,
       "persistent": true
     },
-    "lint": {}
+    "lint": {},
+    "type-check": {},
+    "test": {}
   }
 }

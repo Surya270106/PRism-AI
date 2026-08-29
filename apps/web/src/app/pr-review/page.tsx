@@ -1,28 +1,22 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { readApiResponse } from "@/lib/client-api";
 
 const GOLD = "#c9a84c";
 const GOLD_LIGHT = "#e8c87a";
 const DARK_BG = "#060606";
-const SPRING_EASE: any = [0.23, 1, 0.32, 1];
+const SPRING_EASE: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
-const fadeUp: any = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (delay = 0) => ({
-    opacity: 1, y: 0,
-    transition: { duration: 0.7, delay, ease: SPRING_EASE }
-  })
-};
-
-const staggerContainer: any = {
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.05 } }
 };
 
-const childFadeUp: any = {
+const childFadeUp: Variants = {
   hidden: { opacity: 0, y: 14 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: SPRING_EASE } }
 };
@@ -117,6 +111,7 @@ export default function PRReviewPage() {
   // Repo analysis
   const [repoAnalysis, setRepoAnalysis] = useState<RepoAnalysis | null>(null);
   const [analyzingRepo, setAnalyzingRepo] = useState(false);
+  const [repoError, setRepoError] = useState<string | null>(null);
 
   // PRs
   const [prs, setPrs] = useState<PullRequest[]>([]);
@@ -125,6 +120,8 @@ export default function PRReviewPage() {
   const [selectedPr, setSelectedPr] = useState<PullRequest | null>(null);
   const [prReview, setPrReview] = useState<PRReview | null>(null);
   const [analyzingPr, setAnalyzingPr] = useState(false);
+  const [prReviewError, setPrReviewError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -140,11 +137,10 @@ export default function PRReviewPage() {
     if (!session) return;
     async function fetchRepos() {
       try {
-        const res = await fetch("/api/repos");
-        const data = await res.json();
-        setRepos(Array.isArray(data) ? data : []);
+        const data = await readApiResponse(await fetch("/api/repos"));
+        setRepos(Array.isArray(data.repos) ? data.repos as unknown as Repo[] : []);
       } catch (err) {
-        console.error("Error fetching repos:", err);
+        setRepoError(err instanceof Error ? err.message : "Unable to load repositories.");
       } finally {
         setLoadingRepos(false);
       }
@@ -166,16 +162,19 @@ export default function PRReviewPage() {
 
   async function analyzeRepo(fullName: string, force = false) {
     setAnalyzingRepo(true);
+    setRepoError(null);
+    setWarning(null);
     try {
       const res = await fetch("/api/review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ repo: fullName, force }),
       });
-      const data = await res.json();
-      if (data.analysis) setRepoAnalysis(data.analysis);
+      const data = await readApiResponse(res);
+      setRepoAnalysis(data.analysis as RepoAnalysis);
+      setWarning(typeof data.warning === "string" ? data.warning : null);
     } catch (err) {
-      console.error("Repo analysis failed:", err);
+      setRepoError(err instanceof Error ? err.message : "Repository analysis failed. Retry.");
     } finally {
       setAnalyzingRepo(false);
     }
@@ -186,11 +185,10 @@ export default function PRReviewPage() {
     setPrError(null);
     try {
       const res = await fetch(`/api/prs?repo=${encodeURIComponent(fullName)}`);
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || "Failed to fetch PRs");
+      const data = await readApiResponse(res);
       setPrs(Array.isArray(data.pulls) ? data.pulls : []);
-    } catch (err: any) {
-      setPrError(err.message);
+    } catch (err) {
+      setPrError(err instanceof Error ? err.message : "Unable to fetch pull requests.");
     } finally {
       setLoadingPrs(false);
     }
@@ -200,16 +198,19 @@ export default function PRReviewPage() {
     setSelectedPr(pr);
     setAnalyzingPr(true);
     setPrReview(null);
+    setPrReviewError(null);
+    setWarning(null);
     try {
       const res = await fetch("/api/pr-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prUrl: pr.html_url }),
       });
-      const data = await res.json();
-      if (data.status === "success") setPrReview(data.review);
+      const data = await readApiResponse(res);
+      setPrReview(data.review as PRReview);
+      setWarning(typeof data.warning === "string" ? data.warning : null);
     } catch (err) {
-      console.error("PR review failed:", err);
+      setPrReviewError(err instanceof Error ? err.message : "PR review failed. Retry.");
     } finally {
       setAnalyzingPr(false);
     }
@@ -273,7 +274,7 @@ export default function PRReviewPage() {
           style={{ background: "rgba(0,0,0,0.3)", backdropFilter: "blur(20px)" }}>
 
           <div className="flex items-center gap-3 pb-2">
-            <a href="/" className="font-serif italic text-xl font-bold tracking-tight" style={{ color: GOLD }}>PRism</a>
+            <Link href="/" className="font-serif italic text-xl font-bold tracking-tight" style={{ color: GOLD }}>PRism</Link>
             <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-white/30 border border-white/10 px-2 py-0.5 rounded">AI</span>
           </div>
 
@@ -290,6 +291,7 @@ export default function PRReviewPage() {
 
           <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1.5">
             <span className="block text-[10px] uppercase tracking-widest font-mono text-white/30 mb-2">Your Repositories</span>
+            {repoError && !selectedRepo && <div className="p-3 mb-2 rounded border border-red-500/20 bg-red-500/5 text-xs font-mono text-red-400">{repoError}</div>}
             {loadingRepos ? (
               [...Array(5)].map((_, i) => (
                 <div key={i} className="h-14 bg-white/[0.02] animate-pulse rounded border border-white/5" />
@@ -340,7 +342,7 @@ export default function PRReviewPage() {
                   </svg>
                 </div>
                 <p className="text-sm font-mono text-white/30">Select a repository to begin analysis</p>
-                <p className="text-xs font-mono text-white/15 mt-2">PRism will scan it through an HR's eye</p>
+                <p className="text-xs font-mono text-white/15 mt-2">PRism will scan it through an HR&apos;s eye</p>
               </motion.div>
             </div>
           ) : (
@@ -397,6 +399,15 @@ export default function PRReviewPage() {
                           <p className="text-[11px] font-mono text-white/20 mt-2 tracking-wider">Reading README · Analyzing structure · Generating HR report</p>
                         </div>
                       )}
+
+                      {repoError && !analyzingRepo && (
+                        <div className="p-4 rounded-lg border border-red-500/20 bg-red-500/5 text-xs font-mono text-red-400">
+                          {repoError}
+                          <button onClick={() => analyzeRepo(selectedRepo.full_name, true)} className="ml-3 text-amber-400 underline">Retry</button>
+                        </div>
+                      )}
+
+                      {warning && !analyzingRepo && <div className="mb-4 p-3 rounded border border-amber-500/20 bg-amber-500/5 text-xs font-mono text-amber-300">{warning}</div>}
 
                       {repoAnalysis && !analyzingRepo && (
                         <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
@@ -528,7 +539,7 @@ export default function PRReviewPage() {
                       )}
 
                       {prError && (
-                        <div className="p-4 rounded-lg border border-red-500/20 bg-red-500/5 text-xs font-mono text-red-400">{prError}</div>
+                        <div className="p-4 rounded-lg border border-red-500/20 bg-red-500/5 text-xs font-mono text-red-400">{prError}<button onClick={() => fetchPRs(selectedRepo.full_name)} className="ml-3 text-amber-400 underline">Retry</button></div>
                       )}
 
                       {!loadingPrs && !prError && prs.length === 0 && (
@@ -582,6 +593,12 @@ export default function PRReviewPage() {
                           <p className="text-[11px] font-mono text-white/20 mt-2">Running Llama 3.3 vector analysis...</p>
                         </div>
                       )}
+
+                      {prReviewError && !analyzingPr && selectedPr && (
+                        <div className="p-4 rounded-lg border border-red-500/20 bg-red-500/5 text-xs font-mono text-red-400">{prReviewError}<button onClick={() => analyzePR(selectedPr)} className="ml-3 text-amber-400 underline">Retry</button></div>
+                      )}
+
+                      {warning && !analyzingPr && <div className="mb-4 p-3 rounded border border-amber-500/20 bg-amber-500/5 text-xs font-mono text-amber-300">{warning}</div>}
 
                       {/* PR Review Results */}
                       {prReview && selectedPr && !analyzingPr && (

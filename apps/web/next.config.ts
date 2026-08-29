@@ -1,12 +1,9 @@
+import path from "node:path";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   output: "standalone",
+  outputFileTracingRoot: path.join(__dirname, "../.."),
 };
 
 module.exports = nextConfig;

@@ -24,9 +24,13 @@ USE_CLAUDE_FALLBACK = os.getenv("USE_CLAUDE_FALLBACK", "true").lower() == "true"
 CLAUDE_CONFIDENCE_THRESHOLD = float(os.getenv("CLAUDE_CONFIDENCE_THRESHOLD", "0.80"))
 
 LLAMA_SERVER_URL = os.getenv("LLAMA_SERVER_URL", "http://localhost:8000/review")
-LLAMA_API_KEY = os.getenv("LLAMA_API_KEY", "prism_secret_inference_key_123")
+LLAMA_API_KEY = os.getenv("LLAMA_API_KEY", "")
+if USE_LOCAL_MODEL and not LLAMA_API_KEY:
+    logging.warning("LLAMA_API_KEY is missing! Local inference authentication will fail at runtime.")
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+if USE_CLAUDE_FALLBACK and not ANTHROPIC_API_KEY:
+    logging.warning("ANTHROPIC_API_KEY is missing! Claude fallback will fail at runtime.")
 CLAUDE_MODEL = "claude-3-5-sonnet-20240620"
 
 # ---------------------------------------------------------------------------
@@ -52,6 +56,8 @@ class ReviewOutput(BaseModel):
 # ---------------------------------------------------------------------------
 async def fetch_llama_review(diff: str) -> Optional[ReviewOutput]:
     """Calls the local PRism Llama 3B inference server."""
+    if not LLAMA_API_KEY:
+        return None
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(

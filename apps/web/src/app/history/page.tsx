@@ -2,13 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { DM_Sans, DM_Mono, DM_Serif_Display } from "next/font/google";
 import { AlertTriangle, Clock, GitPullRequest, ChevronRight, Sparkles, X, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-
-const dmSans = DM_Sans({ weight: ["400", "500"], subsets: ["latin"] });
-const dmMono = DM_Mono({ weight: ["400", "500"], subsets: ["latin"] });
-const dmSerif = DM_Serif_Display({ weight: "400", subsets: ["latin"], style: ["normal", "italic"] });
+import { readApiResponse } from "@/lib/client-api";
 
 const riskColors = {
   HIGH: { text: "#e74c3c", bg: "rgba(231,76,60,0.1)", border: "rgba(231,76,60,0.2)" },
@@ -32,26 +28,27 @@ export default function HistoryPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     async function fetchReviews() {
+      setIsLoading(true);
+      setError("");
       try {
-        const res = await fetch("/api/reviews");
-        const data = await res.json();
-        if (data.status === "success") {
-          setReviews(data.reviews);
-        }
+        const data = await readApiResponse(await fetch("/api/reviews"));
+        setReviews(Array.isArray(data.reviews) ? data.reviews as unknown as Review[] : []);
       } catch (error) {
-        console.error("Failed to fetch reviews:", error);
+        setError(error instanceof Error ? error.message : "Unable to load review history.");
       } finally {
         setIsLoading(false);
       }
     }
     fetchReviews();
-  }, []);
+  }, [refreshKey]);
 
   return (
-    <main className={`min-h-screen bg-[#060606] text-white ${dmSans.className}`}>
+    <main className="min-h-screen bg-[#060606] text-white font-sans">
       {/* Glow */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-[#c9a84c]/5 blur-[100px] pointer-events-none rounded-full" />
 
@@ -67,7 +64,7 @@ export default function HistoryPage() {
               <ChevronRight className="w-3 h-3" />
               <span className="text-zinc-300">Review History</span>
             </div>
-            <h1 className={`text-4xl text-white ${dmSerif.className}`}>Past Reviews</h1>
+            <h1 className="text-4xl text-white font-serif">Past Reviews</h1>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.05] text-xs text-zinc-400">
             <Clock className="w-3 h-3" />
@@ -76,6 +73,11 @@ export default function HistoryPage() {
         </div>
 
         {/* Loading */}
+        {error && !isLoading && (
+          <div className="mb-5 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
+            {error}<button onClick={() => setRefreshKey((key) => key + 1)} className="ml-3 text-amber-400 underline">Retry</button>
+          </div>
+        )}
         {isLoading && (
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -120,7 +122,7 @@ export default function HistoryPage() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-xs text-zinc-500 ${dmMono.className}`}>{review.prId}</span>
+                          <span className="text-xs text-zinc-500 font-mono">{review.prId}</span>
                           <span className="text-[9px] font-bold px-2 py-0.5 rounded tracking-wider" style={{ color: rc.text, backgroundColor: rc.bg, border: `1px solid ${rc.border}` }}>
                             {review.riskScore} RISK
                           </span>
@@ -136,7 +138,7 @@ export default function HistoryPage() {
                     <div className="flex-shrink-0 text-right">
                       <div className="flex items-center gap-1 text-xs text-zinc-500 mb-1">
                         <GitPullRequest className="w-3 h-3" />
-                        <span className={dmMono.className}>{review.repo}</span>
+                        <span className="font-mono">{review.repo}</span>
                       </div>
                       <span className="text-[11px] text-zinc-600">
                         {new Date(review.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -169,7 +171,7 @@ export default function HistoryPage() {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-[#c9a84c]" />
                 <h3 className="text-sm font-medium text-white">{selectedReview.title}</h3>
-                <span className={`text-[10px] ${dmMono.className} text-zinc-500`}>{selectedReview.prId}</span>
+                <span className="text-[10px] font-mono text-zinc-500">{selectedReview.prId}</span>
               </div>
               <button onClick={() => setSelectedReview(null)} className="p-1 hover:bg-white/10 rounded-md transition-colors">
                 <X className="w-5 h-5 text-zinc-400" />
@@ -187,7 +189,7 @@ export default function HistoryPage() {
               </div>
               <div>
                 <h4 className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Code Diff</h4>
-                <pre className={`text-xs text-zinc-500 bg-black/40 rounded-lg p-4 overflow-auto max-h-[300px] leading-loose ${dmMono.className}`}>
+                <pre className="text-xs text-zinc-500 bg-black/40 rounded-lg p-4 overflow-auto max-h-[300px] leading-loose font-mono">
                   <code>{selectedReview.codeDiff || "No diff available."}</code>
                 </pre>
               </div>

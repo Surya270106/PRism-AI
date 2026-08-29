@@ -1,42 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "../../../lib/prisma";
+import { AppError, errorResponse, logFailure } from "@/lib/api";
+import { githubFetch, parseRepo } from "@/lib/github";
 
 export async function GET(req: NextRequest) {
+  const startedAt = Date.now();
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const repo = req.nextUrl.searchParams.get("repo");
-    if (!repo) {
-      return NextResponse.json({ error: "Repo missing" }, { status: 400 });
-    }
-
-    const accessToken = (session as any).accessToken;
-
-    const res = await fetch(
-      `https://api.github.com/repos/${repo}/pulls?state=all&per_page=20`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/vnd.github.v3+json",
-        },
-      }
-    );
-
-    if (!res.ok) {
-      const errorBody = await res.json().catch(() => ({}));
-      throw new Error(errorBody.message || `GitHub API error: ${res.status}`);
-    }
-
-    const pulls = await res.json();
-    return NextResponse.json({ pulls });
-
-  } catch (error: any) {
-    console.error("PRs fetch error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+    if (!session?.accessToken) throw new AppError("AUTH_REQUIRED", "GitHub session expired. Reconnect GitHub.", 401);
+    const parsed = parseRepo(req.nextUrl.searchParams.get("repo"));
+    const pulls = await githubFetch<unknown[]>(`/repos/${parsed.owner}/${parsed.repo}/pulls?state=all&per_page=20`, session.accessToken);
+    return NextResponse.json({ success: true, pulls });
+  } catch (error) { logFailure("github", "list_pull_requests", startedAt, error); return errorResponse(error); }
 }

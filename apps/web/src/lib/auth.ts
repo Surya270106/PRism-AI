@@ -24,8 +24,9 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
-      (session as any).accessToken = token.accessToken;
+      session.accessToken = token.accessToken;
       return session;
     },
   },
+  pages: { error: "/" },
 };

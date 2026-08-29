@@ -2,9 +2,9 @@
 
 import { useSession, signIn } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
-import { motion, useInView, useScroll, useTransform } from "framer-motion";
+import { motion, useInView, useScroll, useTransform, type Variants } from "framer-motion";
 
-const fadeUp: any = {
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 24 },
   visible: (delay: number = 0) => ({
     opacity: 1, y: 0,
@@ -12,12 +12,12 @@ const fadeUp: any = {
   }),
 };
 
-const stagger: any = {
+const stagger: Variants = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.08 } },
 };
 
-const cardReveal: any = {
+const cardReveal: Variants = {
   hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.23, 1, 0.32, 1] } },
 };
@@ -163,11 +163,11 @@ export default function LandingPage() {
           </motion.div>
 
           <motion.h1 className="h1 mt-8 max-w-4xl" variants={fadeUp} custom={0.1} initial="hidden" animate="visible">
-            Find what's missing<br />in your GitHub <em>before<br />recruiters do.</em>
+            Find what&apos;s missing<br />in your GitHub <em>before<br />recruiters do.</em>
           </motion.h1>
 
           <motion.p variants={fadeUp} custom={0.22} initial="hidden" animate="visible" className="mt-8 text-base md:text-lg text-white/35 max-w-xl leading-relaxed font-light">
-            Most students lose jobs not because they lack skills — but because their GitHub profile doesn't show it. PRism analyses your profile the way a recruiter would, in 15 seconds.
+            Most students lose jobs not because they lack skills — but because their GitHub profile doesn&apos;t show it. PRism analyses your profile the way a recruiter would, in 15 seconds.
           </motion.p>
 
           <motion.div variants={fadeUp} custom={0.34} initial="hidden" animate="visible" className="mt-12 flex flex-wrap gap-4">
@@ -278,7 +278,7 @@ export default function LandingPage() {
           <div className="w-8 h-px bg-[#c9a84c]/60 mx-auto mb-10" />
           <div className="cta-h mb-10">
             See your profile through<br />
-            <em>a recruiter's eyes.</em>
+            <em>a recruiter&apos;s eyes.</em>
           </div>
           <button onClick={() => signIn("github")} className="btn-primary text-sm px-8 py-4">
             Connect GitHub — it&apos;s free →

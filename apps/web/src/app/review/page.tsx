@@ -1,6 +1,8 @@
 "use client";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
+import Link from "next/link";
+import { readApiResponse } from "@/lib/client-api";
 
 interface DimensionScores {
   readme_quality: number;
@@ -30,9 +32,7 @@ function ReviewContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [forceRefresh, setForceRefresh] = useState(false);
-
-  const runReview = (force = false) => {
+  const runReview = useCallback((force = false) => {
     if (!repo) return;
     setLoading(true);
     setAnalysis(null);
@@ -42,16 +42,15 @@ function ReviewContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ repo, force }),
     })
-      .then((r) => r.json())
+      .then(readApiResponse)
       .then((data) => {
-        if (data.error) { setError(data.error); setLoading(false); return; }
-        setAnalysis(data.analysis);
+        setAnalysis(data.analysis as Analysis);
         setLoading(false);
       })
-      .catch(() => { setError("Review failed."); setLoading(false); });
-  };
+      .catch((reason) => { setError(reason instanceof Error ? reason.message : "Repository analysis failed. Retry."); setLoading(false); });
+  }, [repo]);
 
-  useEffect(() => { runReview(); }, [repo]);
+  useEffect(() => { runReview(); }, [runReview]);
 
   // Higher = better (health score)
   const scoreColor =
@@ -79,16 +78,16 @@ function ReviewContent() {
           <h1 className="text-2xl font-bold">PRism AI</h1>
           <p className="text-zinc-400 text-sm">AI Code Review</p>
         </div>
-        <a href="/" className="bg-zinc-800 text-white px-4 py-2 rounded-xl text-sm hover:bg-zinc-700 transition">
+        <Link href="/" className="bg-zinc-800 text-white px-4 py-2 rounded-xl text-sm hover:bg-zinc-700 transition">
           Back to Dashboard
-        </a>
+        </Link>
       </header>
 
       <div className="max-w-5xl mx-auto px-6 py-10">
         <div className="mb-8">
           <p className="text-zinc-500 text-sm mb-1">Reviewing</p>
           <h2 className="text-3xl font-bold break-all">{repo}</h2>
-          <p className="text-zinc-500 mt-1 text-sm">Powered by Kimi-K2 via HuggingFace</p>
+          <p className="text-zinc-500 mt-1 text-sm">Powered by Groq structured analysis</p>
         </div>
 
         {loading && (
@@ -110,6 +109,7 @@ function ReviewContent() {
           <div className="bg-red-950/50 border border-red-800 rounded-2xl p-6 text-red-400">
             <p className="font-semibold mb-1">Review Failed</p>
             <p className="text-sm">{error}</p>
+            <button onClick={() => runReview(true)} className="mt-4 rounded border border-red-700 px-3 py-1 text-sm">Retry</button>
           </div>
         )}
 
@@ -235,9 +235,9 @@ function ReviewContent() {
               >
                 Re-run Analysis
               </button>
-              <a href="/" className="bg-zinc-800 text-white px-5 py-2.5 rounded-xl text-sm hover:bg-zinc-700 transition">
+              <Link href="/" className="bg-zinc-800 text-white px-5 py-2.5 rounded-xl text-sm hover:bg-zinc-700 transition">
                 Back to Dashboard
-              </a>
+              </Link>
             </div>
           </div>
         )}

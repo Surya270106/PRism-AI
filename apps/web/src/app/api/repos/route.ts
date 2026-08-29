@@ -1,44 +1,17 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { Octokit } from "@octokit/rest";
 import { NextResponse } from "next/server";
+import { authOptions } from "@/lib/auth";
+import { AppError, errorResponse, logFailure } from "@/lib/api";
+import { githubFetch } from "@/lib/github";
+
+type Repo = { id: number; name: string; full_name: string; private: boolean; description: string | null; stargazers_count: number; open_issues_count: number; updated_at: string | null; language: string | null; html_url: string };
 
 export async function GET() {
+  const startedAt = Date.now();
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session || !(session as any).accessToken) {
-      return NextResponse.json([], { status: 200 });
-    }
-
-    const octokit = new Octokit({
-      auth: (session as any).accessToken,
-      request: {
-        timeout: 20000,
-      },
-    });
-
-    const { data } =
-      await octokit.repos.listForAuthenticatedUser({
-        sort: "updated",
-        per_page: 10,
-      });
-
-    const repos = data.map((repo) => ({
-      id: repo.id,
-      name: repo.name,
-      full_name: repo.full_name,
-      private: repo.private,
-      open_issues: repo.open_issues_count,
-      updated_at: repo.updated_at,
-      language: repo.language,
-      url: repo.html_url,
-    }));
-
-    return NextResponse.json(repos);
-  } catch (error) {
-    console.error("GitHub repos error:", error);
-
-    return NextResponse.json([], { status: 200 });
-  }
+    if (!session?.accessToken) throw new AppError("AUTH_REQUIRED", "GitHub session expired. Reconnect GitHub.", 401);
+    const data = await githubFetch<Repo[]>("/user/repos?sort=updated&per_page=50&affiliation=owner,collaborator,organization_member", session.accessToken);
+    return NextResponse.json({ success: true, repos: data.map((repo) => ({ ...repo, open_issues: repo.open_issues_count, url: repo.html_url })) });
+  } catch (error) { logFailure("github", "list_repositories", startedAt, error); return errorResponse(error); }
 }

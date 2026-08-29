@@ -26,10 +26,21 @@ jobs:
         cache: 'pip'
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
+
+    - name: Validate Prisma
+      run: npx prisma validate
+
+    - name: Lint and type-check
+      run: |
+        npm run lint
+        npm run type-check
 
     - name: Build Next.js
       run: npm run build
+
+    - name: Run web tests
+      run: npm run test --workspace=web
       
     - name: Install Python dependencies
       run: |

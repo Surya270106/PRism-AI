@@ -1,11 +1,11 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: "postgresql://neondb_owner:npg_EpkPXrh6SM5m@ep-restless-fog-aofmn6za-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-    }
-  }
-});
+/** Legacy compatibility helper. Prefer `npx prisma migrate deploy`. */
+const { PrismaClient } = require("@prisma/client");
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is required. Configure it securely; do not place credentials in source.");
+}
+
+const prisma = new PrismaClient();
 
 async function main() {
   await prisma.$executeRawUnsafe(`
@@ -17,14 +17,10 @@ async function main() {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "RepoAnalysis_pkey" PRIMARY KEY ("id")
-    );
+    )
   `);
-  
-  await prisma.$executeRawUnsafe(`
-    CREATE UNIQUE INDEX IF NOT EXISTS "RepoAnalysis_repo_key" ON "RepoAnalysis"("repo");
-  `);
-  
-  console.log("Table RepoAnalysis created successfully!");
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "RepoAnalysis_repo_key" ON "RepoAnalysis"("repo")`);
+  console.log("RepoAnalysis is ready. Apply Prisma migrations for the complete schema.");
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect());
+main().finally(() => prisma.$disconnect());

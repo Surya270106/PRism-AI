@@ -1,149 +1,81 @@
-# PRism AI — GitHub Career Intelligence
+# PRism AI
 
-> **Find what's missing in your GitHub before recruiters do.**
+PRism AI is a Next.js application that connects to GitHub, analyzes repository evidence, and reviews pull-request diffs with a hosted LLM. The production web path is serverless-safe and does not require Docker, a local Python service, or a local model.
 
-PRism AI analyzes your GitHub profile the way a senior recruiter would — spotting weak spots, missing signals, and career gaps that cost students job opportunities.
+## Architecture
 
----
+The deployable application is the `apps/web` workspace (Next.js 15.5 / React 19). GitHub OAuth is handled by NextAuth. Server route handlers fetch repository metadata, default-branch files, pull requests, and diffs through the GitHub API. Both repository and PR analysis use Groq strict structured outputs, validated again with Zod. Prisma stores repository-analysis cache entries and PR-review history in PostgreSQL when `DATABASE_URL` is configured.
 
-## The Problem
+The Python code under `apps/orchestrator` and `ml` remains available for local research only. Vercel does not call it.
 
-Most students lose job opportunities not because they lack skills — but because their GitHub profile doesn't *show* those skills clearly. Recruiters spend 15 seconds on a profile. PRism tells you exactly what they see.
+## Request paths
 
----
+- GitHub OAuth: `/api/auth/*` → NextAuth GitHub provider → access token stored in the server-side JWT/session.
+- Repositories: `GET /api/repos` → authenticated GitHub `/user/repos`.
+- Pull requests: `GET /api/prs?repo=owner/name` → authenticated GitHub pulls API.
+- Repository analysis: `POST /api/review` → GitHub evidence on the repository default branch → Groq → Zod → optional `RepoAnalysis` upsert.
+- PR review: `POST /api/pr-review` → validated GitHub PR URL → metadata and diff → Groq → Zod → optional `PrReview` insert.
+- Readiness: `GET /api/health` reports configuration booleans only; it never returns secrets.
 
-## Features
+## Local setup
 
-###  Eagle Eye HR — Recruiter Simulation
-Simulates how a recruiter evaluates your GitHub profile in real time:
-- Startup HR perspective
-- FAANG screening lens
-- Internship recruiter view
-
-###  GitHub Profile Scorer
-Scores your profile across key dimensions:
-- Project originality vs tutorial clones
-- README quality and documentation
-- Commit consistency and activity
-- Deployment presence
-- Tech stack diversity
-- Code structure and complexity
-
-###  Red Flag Detector
-Catches issues recruiters silently penalize:
-- Only tutorial/clone repos
-- No deployed projects
-- Empty or copied READMEs
-- Poor commit history
-- No pinned repositories
-- Weak project descriptions
-
-Career Gap Analysis
-Compares your resume claims against GitHub evidence:
-- "Resume says React developer — only 1 React project found"
-- "Claims backend experience — no API or server repos detected"
-- "Strong projects but zero documentation"
-
-###  Automated PR Review
-AI-powered pull request reviews with:
-- Semantic diff analysis (intent, not just lines changed)
-- Risk scoring per PR
-- Security surface mapping
-- Codebase memory across reviews
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js (App Router), TypeScript, Tailwind CSS |
-| Monorepo | Turborepo |
-| AI | Claude API (Anthropic) |
-| Data | GitHub REST API v3 |
-| Deployment | Vercel |
-
----
-
-## Project Structure
-
-```
-PRism-AI/
-├── apps/
-│   └── web/              # Next.js frontend
-│       ├── app/          # App Router pages
-│       ├── components/   # UI components
-│       └── lib/          # AI logic, GitHub API
-
-├── turbo.json
-└── package.json
-```
-
----
-
-## Getting Started
+Requirements: Node.js 22 or 24, npm 11, Python 3.11 only for legacy orchestrator tests, and optional PostgreSQL.
 
 ```bash
-# Clone the repo
-git clone https://github.com/Surya270106/PRism-AI.git
-cd PRism-AI
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp apps/web/.env.example apps/web/.env.local
-# Add your ANTHROPIC_API_KEY and GITHUB_TOKEN
-
-# Run development server
+npm ci
+cp .env.example apps/web/.env.local
+npx prisma validate
+npx prisma generate
 npm run dev
 ```
 
-### Running with Docker (Recommended for Production)
+For an empty database, apply migrations with `npx prisma migrate deploy`. Never use `prisma migrate reset` against a database containing data.
 
-PRism AI is fully containerized and includes a `docker-compose.yml` that provisions both the Next.js application and a PostgreSQL database.
+## Environment variables
+
+| Variable | Required | Purpose |
+|---|---:|---|
+| `GITHUB_ID` | Yes | GitHub OAuth App client ID |
+| `GITHUB_SECRET` | Yes | GitHub OAuth App client secret |
+| `NEXTAUTH_SECRET` | Yes | Signs NextAuth cookies/JWTs |
+| `NEXTAUTH_URL` | Yes | Local or deployed application URL |
+| `GROQ_API_KEY` | Yes | Hosted AI analysis |
+| `GROQ_MODEL` | No | Defaults to `openai/gpt-oss-120b` |
+| `AI_PROVIDER` | No | Defaults to `groq` |
+| `DATABASE_URL` | No | PostgreSQL persistence/cache; AI still returns if unavailable |
+| `GITHUB_TOKEN` | No | Server-only token for public analysis outside an OAuth session |
+
+Legacy `ORCHESTRATOR_URL`, `USE_LOCAL_MODEL`, `USE_CLAUDE_FALLBACK`, `LLAMA_SERVER_URL`, and `ANTHROPIC_API_KEY` are used only by optional local/research services.
+
+## Verification
 
 ```bash
-# Clone the repo
-git clone https://github.com/Surya270106/PRism-AI.git
-cd PRism-AI
-
-# Set up environment variables
-cp apps/web/.env.example apps/web/.env.local
-# Add your required tokens (e.g., GITHUB_ID, GITHUB_SECRET)
-
-# Build and start the containers
-docker compose up -d --build
+npm ci
+npx prisma validate
+npx prisma generate
+npm run lint
+npm run type-check
+npm run test --workspace=web
+npm run build
 ```
-The application will be available at `http://localhost:3000`. Database migrations run automatically during startup.
 
----
+## Vercel and GitHub OAuth
 
-## Roadmap
+Deploy the repository as a monorepo and set the Vercel Root Directory to `apps/web`. Add the required environment variables to Production and Preview. Set `NEXTAUTH_URL` to the final production domain.
 
-- [x] Landing page with PR review positioning
-- [ ] GitHub username analyzer (public profile scan)
-- [ ] Red flag detector with specific issue list
-- [ ] Resume vs GitHub consistency checker
-- [ ] Recruiter persona simulation (startup / FAANG / internship)
-- [ ] Career quest system (gamified improvement missions)
-- [ ] User accounts with progress tracking
-- [ ] Portfolio quality scanner
+For the GitHub OAuth App:
 
----
+- Homepage URL: `https://YOUR_PROJECT.vercel.app`
+- Authorization callback URL: `https://YOUR_PROJECT.vercel.app/api/auth/callback/github`
 
-## Why I Built This
+See [VERCEL_SETUP.md](./VERCEL_SETUP.md) for recovery and redeployment steps.
 
-Students don't lose jobs because they lack skills — they lose them because recruiters can't *see* those skills. After noticing how many strong developers had weak GitHub profiles with no feedback loop, I built PRism to act as an always-available AI recruiter that gives honest, specific, actionable feedback before the real interview.
+## Troubleshooting
 
----
-
-## Live 
-
- [p-rism-ai-web.vercel.app](https://p-rism-ai-web.vercel.app)
-
----
-
+- An empty repository list is no longer treated as a hidden success: reconnect GitHub when the UI reports an expired session.
+- `AI_NOT_CONFIGURED` means `GROQ_API_KEY` is absent; `AI_UNAVAILABLE` covers provider timeout/rate-limit/outage; `AI_RESPONSE_MALFORMED` means the provider returned output that failed runtime validation.
+- A persistence warning means analysis succeeded but PostgreSQL could not cache/save it.
+- GitHub 401/403/404 and rate limits are returned as safe, distinct error categories and logged server-side without tokens or prompts.
 
 ## License
 
